@@ -5,13 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class TtsService {
   TtsService._privateConstructor();
   static final TtsService instance = TtsService._privateConstructor();
-  final FlutterTts _tts = FlutterTts();
+  late final FlutterTts _tts = FlutterTts();
 
-  double speechRate = 0.5; 
+  bool _isInitialized = false;
+
+  double speechRate = 0.5;
   double volume = 1.0;
   double pitch = 1.0;
 
   Future<void> initializeTTS() async {
+    if (_isInitialized) return;
+
     final prefs = await SharedPreferences.getInstance();
     speechRate = prefs.getDouble('speechRate') ?? 0.5;
     volume = prefs.getDouble('volume') ?? 1.0;
@@ -22,10 +26,18 @@ class TtsService {
     await _tts.setVolume(volume);
     await _tts.setPitch(pitch);
 
-    print ("TTS Initialized with rate: $speechRate, volume: $volume, pitch: $pitch");
+    _isInitialized = true;
+
+    print(
+      "TTS Initialized with rate: $speechRate, volume: $volume, pitch: $pitch",
+    );
   }
 
   Future<void> speak(String text) async {
+    if (!_isInitialized) {
+      await initializeTTS();
+    }
+
     await _tts.speak(text);
   }
 
@@ -60,7 +72,9 @@ class TtsService {
   }
 
   Future<void> stop() async {
-    await _tts.stop();
+    if (_isInitialized) {
+      await _tts.stop();
+    }
   }
 
   // Future<void> dispose() async {

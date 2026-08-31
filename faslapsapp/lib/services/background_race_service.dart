@@ -1,43 +1,54 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
+
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import 'package:faslapsapp/race_data.dart';
+import 'package:faslapsapp/services/tts_service.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
-  FlutterForegroundTask.setTaskHandler(
-    RaceTaskHandler(),
-  );
+  FlutterForegroundTask.setTaskHandler(RaceTaskHandler());
 }
 
 class RaceTaskHandler extends TaskHandler {
+  WebSocketChannel? _socketChannel;
+  StreamSubscription? _socketSubscription;
+
+  final TtsService _ttsService = TtsService.instance;
+
+  bool _isConnecting = false;
+
   @override
-  Future<void> onStart(
-    DateTime timestamp,
-    TaskStarter starter,
-  ) async {
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     print("FasLaps background service started");
+
+    WidgetsFlutterBinding.ensureInitialized();
+    // Initialize TTS inside the background isolate.
+    //await _ttsService.initializeTTS();
+
+    print("Background TTS initialized");
   }
-
-
-
-static Future<void> requestPermissions() async {
-  final permission =
-      await FlutterForegroundTask.checkNotificationPermission();
-
-  if (permission != NotificationPermission.granted) {
-    await FlutterForegroundTask.requestNotificationPermission();
-  }
-}
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    print("FasLaps background service is running");
+    // We don't need to repeatedly do anything here.
+    //
+    // The WebSocket stream listener will receive race data
+    // whenever the server sends it.
   }
 
   @override
-  Future<void> onDestroy(
-    DateTime timestamp,
-    bool isTimeout,
-  ) async {
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     print("FasLaps background service stopped");
+
+    await _socketSubscription?.cancel();
+    await _socketChannel?.sink.close();
+
+    await _ttsService.stop();
   }
 
   @override
@@ -51,7 +62,142 @@ static Future<void> requestPermissions() async {
 
   @override
   void onReceiveData(Object data) {
-    print("Received data from app: $data");
+    print("Background service received: $data");
+
+    if (data is Map) {
+      if (data['type'] == 'connect') {
+        final serverAddress = data['serverAddress'];
+
+        if (serverAddress is String) {
+          _connectToServer(serverAddress);
+        }
+      }
+    }
+  }
+
+  Future<void> _connectToServer(String serverAddress) async {
+    if (_isConnecting) {
+      print("Already connecting to the race server.");
+      return;
+    }
+
+    // Don't create a second connection if one already exists.
+    if (_socketChannel != null) {
+      print("Already connected to a race server.");
+      return;
+    }
+
+    _isConnecting = true;
+    serverAddress = 'ws://$serverAddress:5000/mobile';
+
+    try {
+      print(
+        "Background service connecting to: "
+        "$serverAddress",
+      );
+
+      _socketChannel = WebSocketChannel.connect(Uri.parse(serverAddress));
+
+      // Send the user's registration information.
+      await _sendUserName();
+
+      _socketSubscription = _socketChannel!.stream.listen(
+        (event) {
+          print("Background WebSocket received: $event");
+
+          _receiveJSONString(event);
+        },
+        onDone: () {
+          print("Background WebSocket disconnected");
+
+          _socketChannel = null;
+          _socketSubscription = null;
+          FlutterForegroundTask.sendDataToMain({
+            'type': 'connectionStatus',
+            'status': 'disconnected',
+          });
+        },
+        onError: (error) {
+          FlutterForegroundTask.sendDataToMain({
+            'type': 'connectionStatus',
+            'status': 'error',
+          });
+          print("Background WebSocket error: $error");
+
+          _socketChannel = null;
+          _socketSubscription = null;
+        },
+      );
+
+      print("Background WebSocket connected");
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'connectionStatus',
+        'status': 'connected',
+      });
+    } catch (e, stackTrace) {
+      print("Background WebSocket connection error: $e");
+
+      print(stackTrace);
+
+      _socketChannel = null;
+      _socketSubscription = null;
+    } finally {
+      _isConnecting = false;
+    }
+  }
+
+  Future<void> _sendUserName() async {
+    if (_socketChannel == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    final storedFirstName = prefs.getString('firstName') ?? '';
+
+    final storedLastName = prefs.getString('lastName') ?? '';
+
+    final storedPin = prefs.getString('pin') ?? '';
+
+    final registration = {
+      "type": "registration",
+      "firstName": storedFirstName,
+      "lastName": storedLastName,
+      "pin": storedPin,
+    };
+
+    final json = jsonEncode(registration);
+
+    _socketChannel!.sink.add(json);
+
+    print("Background registration sent: $json");
+  }
+
+  Future<void> _receiveJSONString(dynamic jsonString) async {
+    try {
+      print("Background Raw JSON:");
+      print(jsonString);
+
+      final Map<String, dynamic> jsonData = jsonDecode(jsonString);
+
+      final RaceData raceData = RaceData.fromJson(jsonData);
+
+      print(
+        "Background race data received: "
+        "Lap ${raceData.lapNumber}",
+      );
+
+      // Announce the lap through TTS.
+      await _ttsService.announceLap(raceData);
+
+      // Send the race data to the Flutter UI.
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'raceData',
+        'raceData': jsonData,
+      });
+    } catch (e, stackTrace) {
+      print("Background JSON Error:");
+      print(e);
+      print(stackTrace);
+    }
   }
 }
 
@@ -71,8 +217,7 @@ class BackgroundRaceService {
       return;
     }
 
-    final result =
-        await FlutterForegroundTask.startService(
+    final result = await FlutterForegroundTask.startService(
       serviceId: 100,
       notificationTitle: 'FasLaps Race',
       notificationText: 'Race monitoring is active.',
@@ -82,9 +227,15 @@ class BackgroundRaceService {
     print("Foreground service result: $result");
   }
 
+  static void sendServerAddress(String serverAddress) {
+    FlutterForegroundTask.sendDataToTask({
+      'type': 'connect',
+      'serverAddress': serverAddress,
+    });
+  }
+
   static Future<void> stop() async {
-    final result =
-        await FlutterForegroundTask.stopService();
+    final result = await FlutterForegroundTask.stopService();
 
     print("Foreground service stop result: $result");
   }

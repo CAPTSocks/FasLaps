@@ -6,6 +6,8 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  FlutterForegroundTask.initCommunicationPort();
+
   await TtsService.instance.initializeTTS();
 
   FlutterForegroundTask.init(
@@ -22,7 +24,9 @@ Future<void> main() async {
       playSound: false,
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(5000),
+      eventAction: ForegroundTaskEventAction.repeat(
+        5000,
+      ),
     ),
   );
 

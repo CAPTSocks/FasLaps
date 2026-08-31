@@ -4,30 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:faslapsapp/race_data.dart';
 import 'package:faslapsapp/services/race_connection_service.dart';
 import 'package:faslapsapp/services/background_race_service.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class ConnectionPage extends StatefulWidget {
   final String serverAddress;
 
-  const ConnectionPage({
-    super.key,
-    required this.serverAddress,
-  });
+  const ConnectionPage({super.key, required this.serverAddress});
 
   @override
   State<ConnectionPage> createState() => _ConnectionPageState();
 }
 
 class _ConnectionPageState extends State<ConnectionPage> {
-  final RaceConnectionService raceService =
-      RaceConnectionService.instance;
+  final RaceConnectionService raceService = RaceConnectionService.instance;
 
   final List<RaceData> raceHistory = [];
 
-  late StreamSubscription<List<RaceData>>
-      raceHistorySubscription;
+  late StreamSubscription<List<RaceData>> raceHistorySubscription;
 
-  late StreamSubscription<ConnectionStatus>
-      statusSubscription;
+  late StreamSubscription<ConnectionStatus> statusSubscription;
 
   String status = "Connecting...";
 
@@ -35,55 +30,50 @@ class _ConnectionPageState extends State<ConnectionPage> {
   void initState() {
     super.initState();
 
+    _initForegroundTaskListener();
     raceHistory.addAll(raceService.raceHistory);
 
-    raceHistorySubscription =
-        raceService.raceHistoryStream.listen(
-      (history) {
-        if (!mounted) return;
+    raceHistorySubscription = raceService.raceHistoryStream.listen((history) {
+      if (!mounted) return;
 
-        setState(() {
-          raceHistory
-            ..clear()
-            ..addAll(history);
-        });
-      },
-    );
+      setState(() {
+        raceHistory
+          ..clear()
+          ..addAll(history);
+      });
+    });
 
-    statusSubscription =
-        raceService.statusStream.listen(
-      (connectionStatus) {
-        if (!mounted) return;
+    statusSubscription = raceService.statusStream.listen((connectionStatus) {
+      if (!mounted) return;
 
-        setState(() {
-          switch (connectionStatus) {
-            case ConnectionStatus.connected:
-              status = "Connected";
-              break;
+      setState(() {
+        switch (connectionStatus) {
+          case ConnectionStatus.connected:
+            status = "Connected";
+            break;
 
-            case ConnectionStatus.disconnected:
-              status = "Disconnected";
-              break;
+          case ConnectionStatus.disconnected:
+            status = "Disconnected";
+            break;
 
-            case ConnectionStatus.connectionError:
-              status = "Connection Error";
-              break;
-          }
-        });
-      },
-    );
+          case ConnectionStatus.connectionError:
+            status = "Connection Error";
+            break;
+        }
+      });
+    });
 
     _startRace();
   }
 
   Future<void> _startRace() async {
-    
     await BackgroundRaceService.requestPermissions();
     await BackgroundRaceService.start();
+    BackgroundRaceService.sendServerAddress(widget.serverAddress);
 
-    await raceService.connect(
-      widget.serverAddress,
-    );
+    // await raceService.connect(
+    //   widget.serverAddress,
+    // );
   }
 
   // Future<void> _connect() async {
@@ -101,8 +91,69 @@ class _ConnectionPageState extends State<ConnectionPage> {
     // We eventually want it to continue running
     // when the page is no longer visible.
 
+    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+
     super.dispose();
   }
+
+  void _initForegroundTaskListener() {
+    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+  }
+
+ void _onReceiveTaskData(Object data) {
+  print("UI received from background: $data");
+
+  if (data is! Map) return;
+
+  final type = data['type'];
+
+  if (type == 'connectionStatus') {
+    final connectionStatus = data['status'];
+
+    if (!mounted) return;
+
+    setState(() {
+      switch (connectionStatus) {
+        case 'connected':
+          status = "Connected";
+          break;
+
+        case 'disconnected':
+          status = "Disconnected";
+          break;
+
+        case 'error':
+          status = "Connection Error";
+          break;
+      }
+    });
+
+    return;
+  }
+
+  if (type == 'raceData') {
+    final raceDataJson = data['raceData'];
+
+    if (raceDataJson is! Map<String, dynamic>) {
+      return;
+    }
+
+    try {
+      final raceData =
+          RaceData.fromJson(raceDataJson);
+
+      if (!mounted) return;
+
+      setState(() {
+        raceHistory.add(raceData);
+      });
+    } catch (e) {
+      print(
+        "Error processing background race data: $e",
+      );
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -132,25 +183,18 @@ class _ConnectionPageState extends State<ConnectionPage> {
           children: [
             Text(
               status,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(
-                    color: status == 'Connected'
-                        ? Colors.green
-                        : Colors.red,
-                  ),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: status == 'Connected' ? Colors.green : Colors.red,
+              ),
             ),
 
             const SizedBox(height: 20),
 
             Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
-                borderRadius:
-                    BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
@@ -158,36 +202,28 @@ class _ConnectionPageState extends State<ConnectionPage> {
                     child: Text(
                       "Lap",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
                     child: Text(
                       "Lap Time",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
                     child: Text(
                       "Best Lap",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
                     child: Text(
                       "Position",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -203,45 +239,33 @@ class _ConnectionPageState extends State<ConnectionPage> {
                   final lap = raceHistory[index];
 
                   return Card(
-                    margin:
-                        const EdgeInsets.symmetric(
-                          vertical: 3,
-                        ),
+                    margin: const EdgeInsets.symmetric(vertical: 3),
                     child: Padding(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        vertical: 10,
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               "${lap.lapNumber}",
-                              textAlign:
-                                  TextAlign.center,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           Expanded(
                             child: Text(
-                              lap.lapTimeSeconds
-                                  .toStringAsFixed(3),
-                              textAlign:
-                                  TextAlign.center,
+                              lap.lapTimeSeconds.toStringAsFixed(3),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           Expanded(
                             child: Text(
-                              lap.bestLapTimeSeconds
-                                  .toStringAsFixed(3),
-                              textAlign:
-                                  TextAlign.center,
+                              lap.bestLapTimeSeconds.toStringAsFixed(3),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                           Expanded(
                             child: Text(
                               "${lap.racePosition}",
-                              textAlign:
-                                  TextAlign.center,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
