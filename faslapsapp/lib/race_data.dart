@@ -22,5 +22,14 @@ class RaceData {
       racePosition: json['racePosition'] as int,
     );
   }
-}
 
+  Map<String, dynamic> toJson() {
+    return {
+      'raceData': raceData,
+      'lapNumber': lapNumber,
+      'lapTimeSeconds': lapTimeSeconds,
+      'bestLapTimeSeconds': bestLapTimeSeconds,
+      'racePosition': racePosition,
+    };
+  }
+}

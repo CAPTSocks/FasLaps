@@ -18,6 +18,8 @@ class RaceTaskHandler extends TaskHandler {
   WebSocketChannel? _socketChannel;
   StreamSubscription? _socketSubscription;
 
+  final List<RaceData> _raceHistory = [];
+
   final TtsService _ttsService = TtsService.instance;
 
   bool _isConnecting = false;
@@ -60,20 +62,52 @@ class RaceTaskHandler extends TaskHandler {
     }
   }
 
-  @override
-  void onReceiveData(Object data) {
-    print("Background service received: $data");
+@override
+void onReceiveData(Object data) {
+  print("Background service received: $data");
 
-    if (data is Map) {
-      if (data['type'] == 'connect') {
-        final serverAddress = data['serverAddress'];
+  if (data is! Map) return;
 
-        if (serverAddress is String) {
-          _connectToServer(serverAddress);
-        }
-      }
+  final type = data['type'];
+
+  if (type == 'connect') {
+    final serverAddress = data['serverAddress'];
+
+    if (serverAddress is String) {
+      _connectToServer(serverAddress);
     }
+
+    return;
   }
+
+  if (type == 'getRaceHistory') {
+    _sendRaceHistoryToMain();
+
+    return;
+  }
+}
+
+void _sendRaceHistoryToMain() {
+  final historyJson = _raceHistory.map((lap) {
+    return {
+      'raceData': lap.raceData,
+      'lapNumber': lap.lapNumber,
+      'lapTimeSeconds': lap.lapTimeSeconds,
+      'bestLapTimeSeconds': lap.bestLapTimeSeconds,
+      'racePosition': lap.racePosition,
+    };
+  }).toList();
+
+  FlutterForegroundTask.sendDataToMain({
+    'type': 'raceHistory',
+    'history': historyJson,
+  });
+
+  print(
+    "Sent ${historyJson.length} laps "
+    "to Flutter UI",
+  );
+}
 
   Future<void> _connectToServer(String serverAddress) async {
     if (_isConnecting) {
@@ -185,6 +219,9 @@ class RaceTaskHandler extends TaskHandler {
         "Lap ${raceData.lapNumber}",
       );
 
+      //Save the lap data to the race history list.
+      _raceHistory.add(raceData);
+
       // Announce the lap through TTS.
       await _ttsService.announceLap(raceData);
 
@@ -211,6 +248,8 @@ class BackgroundRaceService {
     }
   }
 
+  
+
   static Future<void> start() async {
     if (await FlutterForegroundTask.isRunningService) {
       print("FasLaps background service is already running.");
@@ -233,6 +272,12 @@ class BackgroundRaceService {
       'serverAddress': serverAddress,
     });
   }
+
+  static void requestRaceHistory() {
+  FlutterForegroundTask.sendDataToTask({
+    'type': 'getRaceHistory',
+  });
+}
 
   static Future<void> stop() async {
     final result = await FlutterForegroundTask.stopService();

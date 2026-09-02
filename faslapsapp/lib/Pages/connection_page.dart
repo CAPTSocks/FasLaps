@@ -1,10 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:faslapsapp/race_data.dart';
-import 'package:faslapsapp/services/race_connection_service.dart';
 import 'package:faslapsapp/services/background_race_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:faslapsapp/services/race_history_service.dart';
 
 class ConnectionPage extends StatefulWidget {
   final String serverAddress;
@@ -16,13 +14,7 @@ class ConnectionPage extends StatefulWidget {
 }
 
 class _ConnectionPageState extends State<ConnectionPage> {
-  final RaceConnectionService raceService = RaceConnectionService.instance;
-
   final List<RaceData> raceHistory = [];
-
-  late StreamSubscription<List<RaceData>> raceHistorySubscription;
-
-  late StreamSubscription<ConnectionStatus> statusSubscription;
 
   String status = "Connecting...";
 
@@ -31,67 +23,30 @@ class _ConnectionPageState extends State<ConnectionPage> {
     super.initState();
 
     _initForegroundTaskListener();
-    raceHistory.addAll(raceService.raceHistory);
 
-    raceHistorySubscription = raceService.raceHistoryStream.listen((history) {
-      if (!mounted) return;
-
-      setState(() {
-        raceHistory
-          ..clear()
-          ..addAll(history);
-      });
-    });
-
-    statusSubscription = raceService.statusStream.listen((connectionStatus) {
-      if (!mounted) return;
-
-      setState(() {
-        switch (connectionStatus) {
-          case ConnectionStatus.connected:
-            status = "Connected";
-            break;
-
-          case ConnectionStatus.disconnected:
-            status = "Disconnected";
-            break;
-
-          case ConnectionStatus.connectionError:
-            status = "Connection Error";
-            break;
-        }
-      });
-    });
+    BackgroundRaceService.requestRaceHistory();
 
     _startRace();
   }
 
   Future<void> _startRace() async {
     await BackgroundRaceService.requestPermissions();
+
     await BackgroundRaceService.start();
+
     BackgroundRaceService.sendServerAddress(widget.serverAddress);
-
-    // await raceService.connect(
-    //   widget.serverAddress,
-    // );
   }
-
-  // Future<void> _connect() async {
-  //   await raceService.connect(
-  //     widget.serverAddress,
-  //   );
-  // }
 
   @override
   void dispose() {
-    raceHistorySubscription.cancel();
-    statusSubscription.cancel();
-
-    // Do NOT disconnect the race service here.
-    // We eventually want it to continue running
-    // when the page is no longer visible.
-
+    // Remove this page's listener.
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+
+    // IMPORTANT:
+    // Do NOT stop the race service here.
+    //
+    // We want the race to continue if the user
+    // backgrounds the app or navigates away.
 
     super.dispose();
   }
@@ -100,60 +55,168 @@ class _ConnectionPageState extends State<ConnectionPage> {
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
   }
 
- void _onReceiveTaskData(Object data) {
-  print("UI received from background: $data");
+  void _onReceiveTaskData(Object data) {
+    print("UI received from background: $data");
 
-  if (data is! Map) return;
+    if (data is! Map) return;
 
-  final type = data['type'];
+    final type = data['type'];
 
-  if (type == 'connectionStatus') {
-    final connectionStatus = data['status'];
-
-    if (!mounted) return;
-
-    setState(() {
-      switch (connectionStatus) {
-        case 'connected':
-          status = "Connected";
-          break;
-
-        case 'disconnected':
-          status = "Disconnected";
-          break;
-
-        case 'error':
-          status = "Connection Error";
-          break;
-      }
-    });
-
-    return;
-  }
-
-  if (type == 'raceData') {
-    final raceDataJson = data['raceData'];
-
-    if (raceDataJson is! Map<String, dynamic>) {
-      return;
-    }
-
-    try {
-      final raceData =
-          RaceData.fromJson(raceDataJson);
+    // Handle connection status messages.
+    if (type == 'connectionStatus') {
+      final connectionStatus = data['status'];
 
       if (!mounted) return;
 
       setState(() {
-        raceHistory.add(raceData);
+        switch (connectionStatus) {
+          case 'connected':
+            status = "Connected";
+            break;
+
+          case 'disconnected':
+            status = "Disconnected";
+            break;
+
+          case 'error':
+            status = "Connection Error";
+            break;
+        }
       });
-    } catch (e) {
+
+      return;
+    }
+
+    if (type == 'raceHistory') {
+      final history = data['history'];
+
+      if (history is! List) {
+        return;
+      }
+
+      try {
+        final loadedHistory = history.whereType<Map>().map((lapJson) {
+          return RaceData.fromJson(Map<String, dynamic>.from(lapJson));
+        }).toList();
+
+        if (!mounted) return;
+
+        setState(() {
+          raceHistory
+            ..clear()
+            ..addAll(loadedHistory);
+        });
+
+        print(
+          "Loaded ${raceHistory.length} laps "
+          "from background service",
+        );
+      } catch (e, stackTrace) {
+        print("Error loading race history:");
+        print(e);
+        print(stackTrace);
+      }
+
+      return;
+    }
+
+    // Handle race data messages.
+    if (type == 'raceData') {
+      final raceDataJson = data['raceData'];
+
+      if (raceDataJson is! Map<String, dynamic>) {
+        return;
+      }
+
+      try {
+        final raceData = RaceData.fromJson(raceDataJson);
+
+        if (!mounted) return;
+
+        setState(() {
+          raceHistory.add(raceData);
+        });
+      } catch (e) {
+        print("Error processing background race data: $e");
+      }
+    }
+  }
+
+  Future<void> _stopRace() async {
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Stop Race?"),
+          content: const Text(
+            "Would you like to save the race data before stopping?",
+          ),
+          actions: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context, true);
+                      },
+                      child: const Text("Save"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context, false);
+                      },
+                      child: const Text("Don't Save"),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text("Cancel"),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSave == null) {
+      // User canceled the dialog.
+      return;
+    }
+
+if (shouldSave) {
+  await RaceHistoryService.saveRace(raceHistory);
+
+  final savedRaces = await RaceHistoryService.loadRaces();
+
+  print("Number of saved races: ${savedRaces.length}");
+
+  for (final race in savedRaces) {
+    print("Race date: ${race.date}");
+    print("Number of laps: ${race.laps.length}");
+
+    for (final lap in race.laps) {
       print(
-        "Error processing background race data: $e",
+        "Lap ${lap.lapNumber}: "
+        "${lap.lapTimeSeconds} seconds, "
+        "Position ${lap.racePosition}",
       );
     }
   }
 }
+
+    await BackgroundRaceService.stop();
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,19 +227,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
           IconButton(
             icon: const Icon(Icons.stop),
             tooltip: "Stop Race",
-            onPressed: () async {
-              await raceService.disconnect();
-
-              await BackgroundRaceService.stop();
-
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
+            onPressed: _stopRace,
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
