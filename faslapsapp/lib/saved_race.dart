@@ -1,8 +1,8 @@
-import 'race_data.dart';
+import 'lap_data.dart';
 
 class SavedRace {
   final DateTime date;
-  final List<RaceData> laps;
+  final List<LapData> laps;
 
   SavedRace({
     required this.date,
@@ -21,7 +21,7 @@ class SavedRace {
       date: DateTime.parse(json['date'] as String),
       laps: (json['laps'] as List)
           .map(
-            (lap) => RaceData.fromJson(
+            (lap) => LapData.fromJson(
               Map<String, dynamic>.from(lap),
             ),
           )

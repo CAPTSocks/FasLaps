@@ -1,21 +1,21 @@
-class RaceData {
-  String raceData;
+class LapData {
+  String type;
   int lapNumber;
   double lapTimeSeconds;
   double bestLapTimeSeconds;
   int racePosition;
 
-  RaceData({
-    required this.raceData,
+  LapData({
+    required this.type,
     required this.lapNumber,
     required this.lapTimeSeconds,
     required this.bestLapTimeSeconds,
     required this.racePosition,
   });
 
-  factory RaceData.fromJson(Map<String, dynamic> json) {
-    return RaceData(
-      raceData: json['raceData'] as String,
+  factory LapData.fromJson(Map<String, dynamic> json) {
+    return LapData(
+      type: json['type'] as String,
       lapNumber: json['lapNumber'] as int,
       lapTimeSeconds: (json['lapTimeSeconds'] as num).toDouble(),
       bestLapTimeSeconds: (json['bestLapTimeSeconds'] as num).toDouble(),
@@ -25,7 +25,7 @@ class RaceData {
 
   Map<String, dynamic> toJson() {
     return {
-      'raceData': raceData,
+      'type': type,
       'lapNumber': lapNumber,
       'lapTimeSeconds': lapTimeSeconds,
       'bestLapTimeSeconds': bestLapTimeSeconds,

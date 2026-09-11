@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../saved_race.dart';
-import '../race_data.dart';
+import '../lap_data.dart';
 
 class RaceHistoryService {
   static const String _storageKey = 'savedRaces';
@@ -26,12 +26,12 @@ class RaceHistoryService {
         .toList();
   }
 
-  static Future<void> saveRace(List<RaceData> laps) async {
+  static Future<void> saveRace(List<LapData> laps) async {
     final races = await loadRaces();
 
     final newRace = SavedRace(
       date: DateTime.now(),
-      laps: List<RaceData>.from(laps),
+      laps: List<LapData>.from(laps),
     );
 
     races.add(newRace);

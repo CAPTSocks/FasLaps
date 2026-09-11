@@ -3,6 +3,7 @@ import 'package:faslapsapp/Pages/startup_page.dart';
 import 'Services/tts_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

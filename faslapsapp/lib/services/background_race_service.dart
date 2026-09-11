@@ -6,7 +6,8 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:faslapsapp/race_data.dart';
+import 'package:faslapsapp/lap_data.dart';
+import 'package:faslapsapp/race_info.dart';
 import 'package:faslapsapp/services/tts_service.dart';
 
 @pragma('vm:entry-point')
@@ -18,7 +19,7 @@ class RaceTaskHandler extends TaskHandler {
   WebSocketChannel? _socketChannel;
   StreamSubscription? _socketSubscription;
 
-  final List<RaceData> _raceHistory = [];
+  final List<LapData> _raceHistory = [];
 
   final TtsService _ttsService = TtsService.instance;
 
@@ -62,52 +63,52 @@ class RaceTaskHandler extends TaskHandler {
     }
   }
 
-@override
-void onReceiveData(Object data) {
-  print("Background service received: $data");
+  @override
+  void onReceiveData(Object data) {
+    print("Background service received: $data");
 
-  if (data is! Map) return;
+    if (data is! Map) return;
 
-  final type = data['type'];
+    final type = data['type'];
 
-  if (type == 'connect') {
-    final serverAddress = data['serverAddress'];
+    if (type == 'connect') {
+      final serverAddress = data['serverAddress'];
 
-    if (serverAddress is String) {
-      _connectToServer(serverAddress);
+      if (serverAddress is String) {
+        _connectToServer(serverAddress);
+      }
+
+      return;
     }
 
-    return;
+    if (type == 'getRaceHistory') {
+      _sendRaceHistoryToMain();
+
+      return;
+    }
   }
 
-  if (type == 'getRaceHistory') {
-    _sendRaceHistoryToMain();
+  void _sendRaceHistoryToMain() {
+    final historyJson = _raceHistory.map((lap) {
+      return {
+        'lapData': lap.type,
+        'lapNumber': lap.lapNumber,
+        'lapTimeSeconds': lap.lapTimeSeconds,
+        'bestLapTimeSeconds': lap.bestLapTimeSeconds,
+        'racePosition': lap.racePosition,
+      };
+    }).toList();
 
-    return;
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'raceHistory',
+      'history': historyJson,
+    });
+
+    print(
+      "Sent ${historyJson.length} laps "
+      "to Flutter UI",
+    );
   }
-}
-
-void _sendRaceHistoryToMain() {
-  final historyJson = _raceHistory.map((lap) {
-    return {
-      'raceData': lap.raceData,
-      'lapNumber': lap.lapNumber,
-      'lapTimeSeconds': lap.lapTimeSeconds,
-      'bestLapTimeSeconds': lap.bestLapTimeSeconds,
-      'racePosition': lap.racePosition,
-    };
-  }).toList();
-
-  FlutterForegroundTask.sendDataToMain({
-    'type': 'raceHistory',
-    'history': historyJson,
-  });
-
-  print(
-    "Sent ${historyJson.length} laps "
-    "to Flutter UI",
-  );
-}
 
   Future<void> _connectToServer(String serverAddress) async {
     if (_isConnecting) {
@@ -205,36 +206,73 @@ void _sendRaceHistoryToMain() {
     print("Background registration sent: $json");
   }
 
-  Future<void> _receiveJSONString(dynamic jsonString) async {
+  void _receiveJSONString(String jsonString) {
     try {
-      print("Background Raw JSON:");
+      print("Raw JSON:");
       print(jsonString);
 
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
 
-      final RaceData raceData = RaceData.fromJson(jsonData);
+      final String? messageType = jsonData['type'];
 
-      print(
-        "Background race data received: "
-        "Lap ${raceData.lapNumber}",
-      );
+      if (messageType == null) {
+        print("Received JSON without a type.");
+        return;
+      }
 
-      //Save the lap data to the race history list.
-      _raceHistory.add(raceData);
+      switch (messageType) {
+        case 'lapData':
+          _handleLapData(jsonData);
+          break;
 
-      // Announce the lap through TTS.
-      await _ttsService.announceLap(raceData);
+        case 'raceInfo':
+          _handleRaceInfo(jsonData);
+          break;
 
-      // Send the race data to the Flutter UI.
-      FlutterForegroundTask.sendDataToMain({
-        'type': 'raceData',
-        'raceData': jsonData,
-      });
-    } catch (e, stackTrace) {
-      print("Background JSON Error:");
+        default:
+          print("Unknown message type received: $messageType");
+          break;
+      }
+    } catch (e, stack) {
+      print("JSON Error:");
       print(e);
-      print(stackTrace);
+      print(stack);
     }
+  }
+
+  void _handleLapData(Map<String, dynamic> jsonData) {
+    try {
+      final lapData = LapData.fromJson(jsonData);
+
+      _raceHistory.add(lapData);
+
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'lapData',
+        'lapData': lapData.toJson(),
+      });
+
+      _ttsService.announceLap(lapData);
+    } catch (e, stack) {
+      print("Error handling lap data:");
+      print(e);
+      print(stack);
+    }
+  }
+}
+
+void _handleRaceInfo(Map<String, dynamic> jsonData) {
+  try {
+    final raceInfo = RaceInfo.fromJson(jsonData);
+
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'raceInfo',
+      'raceInfo': raceInfo.toJson(),
+    });
+    
+  } catch (e, stack) {
+    print("Error handling race info:");
+    print(e);
+    print(stack);
   }
 }
 
@@ -247,8 +285,6 @@ class BackgroundRaceService {
       await FlutterForegroundTask.requestNotificationPermission();
     }
   }
-
-  
 
   static Future<void> start() async {
     if (await FlutterForegroundTask.isRunningService) {
@@ -274,10 +310,8 @@ class BackgroundRaceService {
   }
 
   static void requestRaceHistory() {
-  FlutterForegroundTask.sendDataToTask({
-    'type': 'getRaceHistory',
-  });
-}
+    FlutterForegroundTask.sendDataToTask({'type': 'getRaceHistory'});
+  }
 
   static Future<void> stop() async {
     final result = await FlutterForegroundTask.stopService();

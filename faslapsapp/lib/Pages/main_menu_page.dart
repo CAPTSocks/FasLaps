@@ -13,6 +13,8 @@ class MainMenuPage extends StatelessWidget {
     required this.lastName,
   });
 
+  
+
   @override
   Widget build(BuildContext context) {
     String newfirstName = firstName[0].toUpperCase() + firstName.substring(1);

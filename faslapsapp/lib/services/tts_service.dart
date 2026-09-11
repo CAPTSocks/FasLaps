@@ -1,5 +1,5 @@
 import 'package:flutter_tts/flutter_tts.dart';
-import '../race_data.dart';
+import '../lap_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TtsService {
@@ -41,7 +41,7 @@ class TtsService {
     await _tts.speak(text);
   }
 
-  Future<void> announceLap(RaceData lap) async {
+  Future<void> announceLap(LapData lap) async {
     String speech =
         "Lap ${lap.lapNumber}. "
         "Time ${lap.lapTimeSeconds.toStringAsFixed(2)} seconds. "

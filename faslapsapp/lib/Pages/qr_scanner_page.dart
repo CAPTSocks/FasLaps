@@ -60,11 +60,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
     try {
       final uri = buildWebSocketUri(input);
 
-      setState(() {
-        connectionStatus = "Connecting...";
-      });
+      // setState(() {
+      //   connectionStatus = "Connecting...";
+      // });
 
-      final socket = WebSocketChannel.connect(uri);
+      //final socket = WebSocketChannel.connect(uri);
 
       await controller.stop();
 

@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../race_data.dart';
+import '../lap_data.dart';
 import 'tts_service.dart';
 
 enum ConnectionStatus { connected, disconnected, connectionError }
@@ -20,19 +20,19 @@ class RaceConnectionService {
   WebSocketChannel? _socketChannel;
   StreamSubscription? _subscription;
 
-  final List<RaceData> _raceHistory = [];
+  final List<LapData> _raceHistory = [];
 
-  final StreamController<List<RaceData>> _raceHistoryController =
-      StreamController<List<RaceData>>.broadcast();
+  final StreamController<List<LapData>> _raceHistoryController =
+      StreamController<List<LapData>>.broadcast();
 
   final StreamController<ConnectionStatus> _statusController =
       StreamController<ConnectionStatus>.broadcast();
 
-  Stream<List<RaceData>> get raceHistoryStream => _raceHistoryController.stream;
+  Stream<List<LapData>> get raceHistoryStream => _raceHistoryController.stream;
 
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
 
-  List<RaceData> get raceHistory => List.unmodifiable(_raceHistory);
+  List<LapData> get raceHistory => List.unmodifiable(_raceHistory);
 
   bool get isConnected => _socketChannel != null;
 
@@ -124,15 +124,15 @@ class RaceConnectionService {
     try {
       final Map<String, dynamic> jsonData = jsonDecode(event);
 
-      final RaceData raceData = RaceData.fromJson(jsonData);
+      final LapData lapData = LapData.fromJson(jsonData);
 
-      _raceHistory.add(raceData);
+      _raceHistory.add(lapData);
 
       // Send a copy so outside code cannot modify
       // our internal list.
       _raceHistoryController.add(List.unmodifiable(_raceHistory));
 
-      _ttsService.announceLap(raceData);
+      _ttsService.announceLap(lapData);
     } catch (e, stack) {
       print("JSON Error:");
       print(e);

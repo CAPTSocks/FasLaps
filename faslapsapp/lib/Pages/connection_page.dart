@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:faslapsapp/race_data.dart';
+import 'package:faslapsapp/lap_data.dart';
+import 'package:faslapsapp/race_info.dart';
 import 'package:faslapsapp/services/background_race_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:faslapsapp/services/race_history_service.dart';
@@ -14,17 +15,19 @@ class ConnectionPage extends StatefulWidget {
 }
 
 class _ConnectionPageState extends State<ConnectionPage> {
-  final List<RaceData> raceHistory = [];
+  final List<LapData> raceHistory = [];
 
   String status = "Connecting...";
+  String raceName = "Race Name";
+  String raceHeat = "Race Heat";
 
   @override
   void initState() {
     super.initState();
-
     _initForegroundTaskListener();
 
     BackgroundRaceService.requestRaceHistory();
+    RaceHistoryService.clearRaces();
 
     _startRace();
   }
@@ -96,7 +99,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
       try {
         final loadedHistory = history.whereType<Map>().map((lapJson) {
-          return RaceData.fromJson(Map<String, dynamic>.from(lapJson));
+          return LapData.fromJson(Map<String, dynamic>.from(lapJson));
         }).toList();
 
         if (!mounted) return;
@@ -120,24 +123,45 @@ class _ConnectionPageState extends State<ConnectionPage> {
       return;
     }
 
-    // Handle race data messages.
-    if (type == 'raceData') {
-      final raceDataJson = data['raceData'];
+    // Handle lap data messages.
+    if (type == 'lapData') {
+      final lapDataJson = data['lapData'];
 
-      if (raceDataJson is! Map<String, dynamic>) {
+      if (lapDataJson is! Map<String, dynamic>) {
         return;
       }
 
       try {
-        final raceData = RaceData.fromJson(raceDataJson);
+        final lapData = LapData.fromJson(lapDataJson);
 
         if (!mounted) return;
 
         setState(() {
-          raceHistory.add(raceData);
+          raceHistory.add(lapData);
         });
       } catch (e) {
-        print("Error processing background race data: $e");
+        print("Error processing background lap data: $e");
+      }
+    }
+
+    if (type == 'raceInfo') {
+      final raceInfoJson = data['raceInfo'];
+
+      if (raceInfoJson is! Map<String, dynamic>) {
+        return;
+      }
+
+      try {
+        final raceInfo = RaceInfo.fromJson(raceInfoJson);
+
+        if (!mounted) return;
+
+        setState(() {
+          raceName = raceInfo.raceName;
+          raceHeat = raceInfo.raceHeat;
+        });
+      } catch (e) {
+        print("Error processing background race info: $e");
       }
     }
   }
@@ -234,16 +258,32 @@ if (shouldSave) {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Text(
+                  raceName,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                Text(
+                  " - ",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                Text(
+                  raceHeat,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
-              status,
+              "Status: $status",
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: status == 'Connected' ? Colors.green : Colors.red,
               ),
             ),
-
             const SizedBox(height: 20),
-
             Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
@@ -283,9 +323,7 @@ if (shouldSave) {
                 ],
               ),
             ),
-
             const SizedBox(height: 8),
-
             Expanded(
               child: ListView.builder(
                 itemCount: raceHistory.length,
