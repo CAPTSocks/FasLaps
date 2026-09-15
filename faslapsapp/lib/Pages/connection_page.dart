@@ -17,9 +17,12 @@ class ConnectionPage extends StatefulWidget {
 class _ConnectionPageState extends State<ConnectionPage> {
   final List<LapData> raceHistory = [];
 
+  RaceInfo? currentRaceInfo;
+
   String status = "Connecting...";
-  String raceName = "Race Name";
-  String raceHeat = "Race Heat";
+  String raceName = "Waiting for Race Name";
+  String raceHeat = "Waiting for Race Heat";
+  bool raceInfoReceived = false;
 
   @override
   void initState() {
@@ -58,7 +61,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
   }
 
-  void _onReceiveTaskData(Object data) {
+  void _onReceiveTaskData(Object data) async {
     print("UI received from background: $data");
 
     if (data is! Map) return;
@@ -147,21 +150,52 @@ class _ConnectionPageState extends State<ConnectionPage> {
     if (type == 'raceInfo') {
       final raceInfoJson = data['raceInfo'];
 
-      if (raceInfoJson is! Map<String, dynamic>) {
+      if (raceInfoJson is! Map) {
         return;
       }
 
       try {
-        final raceInfo = RaceInfo.fromJson(raceInfoJson);
+        final raceInfo = RaceInfo.fromJson(
+          Map<String, dynamic>.from(raceInfoJson),
+        );
+
+        if (raceInfoReceived)
+        {
+          RaceHistoryService.saveRace(currentRaceInfo!, raceHistory);
+        }
+
+        currentRaceInfo = raceInfo;
+        print ("CURRENT RACE INFO: ${currentRaceInfo?.raceName} - ${currentRaceInfo?.raceId}");
+        final existingRace = await RaceHistoryService.findRace(raceInfo.raceId);
 
         if (!mounted) return;
 
         setState(() {
           raceName = raceInfo.raceName;
           raceHeat = raceInfo.raceHeat;
+          raceInfoReceived = true;
+
+          // If this race has been saved before, load its laps.
+          raceHistory
+            ..clear()
+            ..addAll(existingRace?.laps ?? []);
         });
-      } catch (e) {
-        print("Error processing background race info: $e");
+
+        if (existingRace != null) {
+          print(
+            "Found existing race ${raceInfo.raceId} "
+            "with ${existingRace.laps.length} laps.",
+          );
+        } else {
+          print(
+            "No saved race found for ${raceInfo.raceId}. "
+            "Starting with empty history.",
+          );
+        }
+      } catch (e, stackTrace) {
+        print("Error processing background race info:");
+        print(e);
+        print(stackTrace);
       }
     }
   }
@@ -214,26 +248,26 @@ class _ConnectionPageState extends State<ConnectionPage> {
       return;
     }
 
-if (shouldSave) {
-  await RaceHistoryService.saveRace(raceHistory);
+    if (shouldSave && currentRaceInfo != null) {
+      await RaceHistoryService.saveRace(currentRaceInfo!, raceHistory);
 
-  final savedRaces = await RaceHistoryService.loadRaces();
+      final savedRaces = await RaceHistoryService.loadRaces();
 
-  print("Number of saved races: ${savedRaces.length}");
+      print("Number of saved races: ${savedRaces.length}");
 
-  for (final race in savedRaces) {
-    print("Race date: ${race.date}");
-    print("Number of laps: ${race.laps.length}");
+      for (final race in savedRaces) {
+        print("Race date: ${race.raceDate}");
+        print("Number of laps: ${race.laps.length}");
 
-    for (final lap in race.laps) {
-      print(
-        "Lap ${lap.lapNumber}: "
-        "${lap.lapTimeSeconds} seconds, "
-        "Position ${lap.racePosition}",
-      );
+        for (final lap in race.laps) {
+          print(
+            "Lap ${lap.lapNumber}: "
+            "${lap.lapTimeSeconds} seconds, "
+            "Position ${lap.racePosition}",
+          );
+        }
+      }
     }
-  }
-}
 
     await BackgroundRaceService.stop();
 
@@ -262,18 +296,9 @@ if (shouldSave) {
           children: [
             Row(
               children: [
-                Text(
-                  raceName,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Text(
-                  " - ",
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                Text(
-                  raceHeat,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(raceName, style: Theme.of(context).textTheme.titleLarge),
+                Text(" - ", style: Theme.of(context).textTheme.titleLarge),
+                Text(raceHeat, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 12),

@@ -59,7 +59,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
         return ListTile(
           title: Text("Race ${index + 1}"),
           subtitle: Text("${race.laps.length} laps"),
-          trailing: Text(_formatDate(race.date)),
+          trailing: Text(_formatDate(race.raceDate)),
           onTap: () {
             Navigator.push(
               context,

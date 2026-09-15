@@ -21,7 +21,7 @@ class RaceDetailsPage extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              _formatDate(race.date),
+              _formatDate(race.raceDate),
               style: Theme.of(context).textTheme.titleMedium,
             ),
 

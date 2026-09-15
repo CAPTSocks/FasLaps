@@ -2,8 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../saved_race.dart';
 import '../lap_data.dart';
+import '../race_info.dart';
+import '../saved_race.dart';
 
 class RaceHistoryService {
   static const String _storageKey = 'savedRaces';
@@ -20,21 +21,51 @@ class RaceHistoryService {
     final List<dynamic> jsonList = jsonDecode(savedData);
 
     return jsonList
-        .map((race) => SavedRace.fromJson(
-              Map<String, dynamic>.from(race),
-            ))
+        .map(
+          (race) => SavedRace.fromJson(
+            Map<String, dynamic>.from(race),
+          ),
+        )
         .toList();
   }
 
-  static Future<void> saveRace(List<LapData> laps) async {
+  static Future<SavedRace?> findRace(String raceId) async {
+    final races = await loadRaces();
+
+    try {
+      return races.firstWhere(
+        (race) => race.raceId == raceId,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static Future<void> saveRace(
+    RaceInfo raceInfo,
+    List<LapData> laps,
+  ) async {
     final races = await loadRaces();
 
     final newRace = SavedRace(
-      date: DateTime.now(),
+      raceId: raceInfo.raceId,
+      raceName: raceInfo.raceName,
+      raceDate: raceInfo.raceDate,
+      raceHeat: raceInfo.raceHeat,
       laps: List<LapData>.from(laps),
     );
 
-    races.add(newRace);
+    final existingIndex = races.indexWhere(
+      (race) => race.raceId == raceInfo.raceId,
+    );
+
+    if (existingIndex >= 0) {
+      // Race already exists, so update it.
+      races[existingIndex] = newRace;
+    } else {
+      // This is a new race.
+      races.add(newRace);
+    }
 
     final jsonList = races
         .map((race) => race.toJson())
@@ -48,14 +79,12 @@ class RaceHistoryService {
     );
   }
 
-  static Future<void> deleteRace(int index) async {
+  static Future<void> deleteRace(String raceId) async {
     final races = await loadRaces();
 
-    if (index < 0 || index >= races.length) {
-      return;
-    }
-
-    races.removeAt(index);
+    races.removeWhere(
+      (race) => race.raceId == raceId,
+    );
 
     final prefs = await SharedPreferences.getInstance();
 

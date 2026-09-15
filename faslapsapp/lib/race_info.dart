@@ -1,6 +1,6 @@
 class RaceInfo {
   final String type;
-  final int raceId;
+  final String raceId;
   final String raceName;
   final DateTime raceDate;
   final String raceHeat;
@@ -16,7 +16,7 @@ class RaceInfo {
   factory RaceInfo.fromJson(Map<String, dynamic> json) {
     return RaceInfo(
       type: json['type'] as String,
-      raceId: json['raceID'] as int,
+      raceId: json['raceID'] as String,
       raceName: json['raceName'] as String,
       raceDate: DateTime.parse(json['raceDate'] as String),
       raceHeat: json['raceHeat'] as String,
