@@ -64,7 +64,7 @@ final TextEditingController ipController = TextEditingController();
                         context,
                         MaterialPageRoute(
                           builder: (_) => QRScannerPage(
-                            manualIP: ipController.text.trim(),
+                           // manualIP: ipController.text.trim(),
                           ),
                         ),
                       );

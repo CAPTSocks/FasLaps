@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'connection_page.dart';
 
@@ -8,7 +7,7 @@ Uri buildWebSocketUri(String input) {
   final trimmedInput = input.trim();
 
   if (trimmedInput.isEmpty) {
-    throw ArgumentError('QR code input cannot be empty');
+    throw ArgumentError('IP address cannot be empty');
   }
 
   final normalizedInput =
@@ -22,9 +21,7 @@ Uri buildWebSocketUri(String input) {
 }
 
 class QRScannerPage extends StatefulWidget {
-  final String? manualIP;
-
-  const QRScannerPage({super.key, this.manualIP});
+  const QRScannerPage({super.key});
 
   @override
   State<QRScannerPage> createState() => _QRScannerPageState();
@@ -37,34 +34,32 @@ class _QRScannerPageState extends State<QRScannerPage> {
     formats: [BarcodeFormat.qrCode],
   );
 
+  final TextEditingController ipController = TextEditingController();
+
   bool isFlashOn = false;
+  bool showManualEntry = false;
   String connectionStatus = "Waiting for QR Scan";
   String? scannedCode;
 
   @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
   }
 
   @override
-  void initState() {
-    super.initState();
-
-    if (widget.manualIP != null) {
-      _connectToSocket(widget.manualIP!);
-    }
+  void dispose() {
+    controller.dispose();
+    ipController.dispose();
+    super.dispose();
   }
 
   Future<void> _connectToSocket(String input) async {
     try {
       final uri = buildWebSocketUri(input);
 
-      // setState(() {
-      //   connectionStatus = "Connecting...";
-      // });
-
-      //final socket = WebSocketChannel.connect(uri);
+      setState(() {
+        connectionStatus = "Connecting...";
+      });
 
       await controller.stop();
 
@@ -73,11 +68,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              ConnectionPage(serverAddress: uri.host),
+          builder: (_) => ConnectionPage(
+            serverAddress: uri.host,
+          ),
         ),
       );
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         connectionStatus = "Connection Failed";
       });
@@ -96,14 +94,29 @@ class _QRScannerPageState extends State<QRScannerPage> {
     _connectToSocket(barcode);
   }
 
+  void _connectManually() {
+    final ip = ipController.text.trim();
+
+    if (ip.isEmpty) {
+      setState(() {
+        connectionStatus = "Please enter an IP address";
+      });
+      return;
+    }
+
+    _connectToSocket(ip);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("QR Code Reader"),
+        title: const Text("Connect to Race"),
         actions: [
           IconButton(
-            icon: Icon(isFlashOn ? Icons.flash_on : Icons.flash_off),
+            icon: Icon(
+              isFlashOn ? Icons.flash_on : Icons.flash_off,
+            ),
             onPressed: () async {
               await controller.toggleTorch();
 
@@ -114,44 +127,136 @@ class _QRScannerPageState extends State<QRScannerPage> {
           ),
         ],
       ),
-      body: widget.manualIP == null
-          ? _buildScanner()
-          : Center(child: CircularProgressIndicator()),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: controller,
+            onDetect: _handleBarcode,
+          ),
+
+          // Instructions at the top
+          Positioned(
+            top: 24,
+            left: 24,
+            right: 24,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Point the camera at a QR code',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+
+          // Manual entry panel
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomPanel(),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildScanner() {
-    return Stack(
-      children: [
-        Positioned(
-          top: 24,
-          left: 24,
-          right: 24,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'Point the camera at a QR code',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ),
+  Widget _buildBottomPanel() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.black87,
         ),
-        MobileScanner(controller: controller, onDetect: _handleBarcode),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              connectionStatus,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showManualEntry) ...[
+              TextField(
+                controller: ipController,
+                keyboardType: TextInputType.url,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: "Server IP Address",
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  hintText: "192.168.1.100:5000",
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  enabledBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white54),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.wifi),
+                  label: const Text("Connect"),
+                  onPressed: _connectManually,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    showManualEntry = false;
+                    connectionStatus = "Waiting for QR Scan";
+                  });
+                },
+                child: const Text(
+                  "Back to QR Scanner",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ] else ...[
+              Text(
+                connectionStatus,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.keyboard),
+                  label: const Text("Enter IP Address Manually"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white70),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      showManualEntry = true;
+                      connectionStatus = "Enter the server IP address";
+                    });
+                  },
+                ),
+              ),
+            ],
+          ],
         ),
-      ],
+      ),
     );
   }
 }

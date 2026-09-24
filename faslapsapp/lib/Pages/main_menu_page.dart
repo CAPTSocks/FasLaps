@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'enter_ip_page.dart';
+import 'qr_scanner_page.dart';
 import 'settings_page.dart';
 import 'package:faslapsapp/pages/race_history_page.dart';
 import 'package:faslapsapp/Pages/practice_race_history_page.dart';
@@ -41,7 +42,7 @@ class MainMenuPage extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const EnterIPPage()),
+                  MaterialPageRoute(builder: (_) => const QRScannerPage()),
                 );
               },
             ),
