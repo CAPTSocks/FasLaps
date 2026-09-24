@@ -9,7 +9,7 @@ import '../saved_race.dart';
 class RaceHistoryService {
   static const String _storageKey = 'savedRaces';
 
-  static Future<List<SavedRace>> loadRaces() async {
+  static Future<List<SavedRace>> loadRaces({String? raceType}) async {
     final prefs = await SharedPreferences.getInstance();
 
     final savedData = prefs.getString(_storageKey);
@@ -20,31 +20,28 @@ class RaceHistoryService {
 
     final List<dynamic> jsonList = jsonDecode(savedData);
 
-    return jsonList
-        .map(
-          (race) => SavedRace.fromJson(
-            Map<String, dynamic>.from(race),
-          ),
-        )
+    final races = jsonList
+        .map((race) => SavedRace.fromJson(Map<String, dynamic>.from(race)))
         .toList();
+
+    if (raceType == null) {
+      return races;
+    }
+
+    return races.where((race) => race.raceType.toLowerCase() == raceType).toList();
   }
 
   static Future<SavedRace?> findRace(String raceId) async {
     final races = await loadRaces();
 
     try {
-      return races.firstWhere(
-        (race) => race.raceId == raceId,
-      );
+      return races.firstWhere((race) => race.raceId == raceId);
     } catch (e) {
       return null;
     }
   }
 
-  static Future<void> saveRace(
-    RaceInfo raceInfo,
-    List<LapData> laps,
-  ) async {
+  static Future<void> saveRace(RaceInfo raceInfo, List<LapData> laps) async {
     final races = await loadRaces();
 
     final newRace = SavedRace(
@@ -52,6 +49,7 @@ class RaceHistoryService {
       raceName: raceInfo.raceName,
       raceDate: raceInfo.raceDate,
       raceHeat: raceInfo.raceHeat,
+      raceType: raceInfo.raceType,
       laps: List<LapData>.from(laps),
     );
 
@@ -67,38 +65,48 @@ class RaceHistoryService {
       races.add(newRace);
     }
 
-    final jsonList = races
-        .map((race) => race.toJson())
-        .toList();
+    final jsonList = races.map((race) => race.toJson()).toList();
 
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(jsonList),
-    );
+    await prefs.setString(_storageKey, jsonEncode(jsonList));
   }
 
   static Future<void> deleteRace(String raceId) async {
     final races = await loadRaces();
 
-    races.removeWhere(
-      (race) => race.raceId == raceId,
-    );
+    races.removeWhere((race) => race.raceId == raceId);
 
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.setString(
       _storageKey,
-      jsonEncode(
-        races.map((race) => race.toJson()).toList(),
-      ),
+      jsonEncode(races.map((race) => race.toJson()).toList()),
     );
   }
 
-  static Future<void> clearRaces() async {
-    final prefs = await SharedPreferences.getInstance();
+ static Future<void> clearRaces({
+  String? raceType,
+}) async {
+  final races = await loadRaces();
 
+  if (raceType == null) {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
+    return;
   }
+
+  races.removeWhere(
+    (race) => race.raceType == raceType,
+  );
+
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString(
+    _storageKey,
+    jsonEncode(
+      races.map((race) => race.toJson()).toList(),
+    ),
+  );
+}
 }

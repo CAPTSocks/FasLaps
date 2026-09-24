@@ -30,7 +30,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _initForegroundTaskListener();
 
     BackgroundRaceService.requestRaceHistory();
-    RaceHistoryService.clearRaces();
+    //RaceHistoryService.clearRaces();
 
     _startRace();
   }

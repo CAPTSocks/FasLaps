@@ -42,12 +42,7 @@ class FasLapsQRApp extends StatelessWidget {
     return MaterialApp(
       title: 'FasLaps QR Reader',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 7, 104, 222),
-        ),
-        useMaterial3: true,
-      ),
+      theme: ThemeData.dark(),
       home: const StartupPage(),
     );
   }

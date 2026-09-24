@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'enter_ip_page.dart';
 import 'settings_page.dart';
 import 'package:faslapsapp/pages/race_history_page.dart';
+import 'package:faslapsapp/Pages/practice_race_history_page.dart';
 
 class MainMenuPage extends StatelessWidget {
   final String firstName;
@@ -36,7 +37,7 @@ class MainMenuPage extends StatelessWidget {
 
             FilledButton.icon(
               icon: const Icon(Icons.qr_code_scanner),
-              label: const Text("Scan QR Code"),
+              label: const Text("Connect To Race"),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -47,7 +48,7 @@ class MainMenuPage extends StatelessWidget {
 
             FilledButton.icon(
               icon: const Icon(Icons.settings),
-              label: const Text("Settings"),
+              label: const Text("My Settings"),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -64,7 +65,19 @@ class MainMenuPage extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text("Race History"),
+              child: const Text("My Races"),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PracticeRaceHistoryPage(),
+                  ),
+                );
+              },
+              child: const Text("My Practice Races"),
             ),
           ],
         ),

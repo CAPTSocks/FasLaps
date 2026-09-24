@@ -4,14 +4,14 @@ import '../saved_race.dart';
 import '../services/race_history_service.dart';
 import 'race_details_page.dart';
 
-class RaceHistoryPage extends StatefulWidget {
-  const RaceHistoryPage({super.key});
+class PracticeRaceHistoryPage extends StatefulWidget {
+  const PracticeRaceHistoryPage({super.key});
 
   @override
-  State<RaceHistoryPage> createState() => _RaceHistoryPageState();
+  State<PracticeRaceHistoryPage> createState() => _PracticeRaceHistoryPageState();
 }
 
-class _RaceHistoryPageState extends State<RaceHistoryPage> {
+class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
   List<SavedRace> savedRaces = [];
   bool isLoading = true;
 
@@ -22,9 +22,10 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
   }
 
   Future<void> _loadRaces() async {
-    final races = await RaceHistoryService.loadRaces(raceType: 'race');
+    final races = await RaceHistoryService.loadRaces(raceType: 'practice');
 
     if (!mounted) return;
+
     setState(() {
       savedRaces = races;
       isLoading = false;
@@ -36,7 +37,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Delete Race?"),
+          title: const Text("Delete Practice?"),
           content: Text(
             "Are you sure you want to delete ${race.raceName}?\n\n"
             "This will permanently delete this race and its "
@@ -79,10 +80,10 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Clear Race History?"),
+          title: const Text("Clear Practice History?"),
           content: Text(
             "Are you sure you want to delete all "
-            "${savedRaces.length} saved races?\n\n"
+            "${savedRaces.length} saved practices?\n\n"
             "This cannot be undone.",
           ),
           actions: [
@@ -107,7 +108,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
     if (shouldClear != true) return;
 
     // We will change this later so it only clears regular races.
-    await RaceHistoryService.clearRaces(raceType: "race");
+    await RaceHistoryService.clearRaces(raceType: "practice");
 
     if (!mounted) return;
 
@@ -120,11 +121,11 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Races"),
+        title: const Text("Practice History"),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep),
-            tooltip: "Clear Race History",
+            tooltip: "Clear Practice History",
             onPressed: savedRaces.isEmpty ? null : _clearRaceHistory,
           ),
         ],
@@ -140,7 +141,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
 
     if (savedRaces.isEmpty) {
       return const Center(
-        child: Text("No saved races.", style: TextStyle(fontSize: 18)),
+        child: Text("No saved practices.", style: TextStyle(fontSize: 18)),
       );
     }
 
@@ -160,7 +161,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
               Text(_formatDate(race.raceDate)),
               IconButton(
                 icon: const Icon(Icons.delete),
-                tooltip: "Delete Race",
+                tooltip: "Delete Practice",
                 onPressed: () => _deleteRace(race),
               ),
             ],
