@@ -120,7 +120,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Races"),
+        title: const Text("My Races"),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep),
@@ -144,7 +144,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       itemCount: savedRaces.length,
       itemBuilder: (context, index) {
         final race = savedRaces[index];
@@ -152,6 +152,10 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
         return ListTile(
           title: Text(
             race.raceName.isEmpty ? "Race ${index + 1}" : race.raceName,
+          ),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: Colors.orange, width: 1.5),
+            borderRadius: BorderRadius.circular(8)
           ),
           subtitle: Text("${race.laps.length} laps"),
           trailing: Row(
@@ -175,6 +179,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
           },
         );
       },
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
     );
   }
 

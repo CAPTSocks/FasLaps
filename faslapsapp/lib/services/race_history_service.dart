@@ -97,7 +97,7 @@ class RaceHistoryService {
   }
 
   races.removeWhere(
-    (race) => race.raceType == raceType,
+    (race) => race.raceType.toLowerCase() == raceType,
   );
 
   final prefs = await SharedPreferences.getInstance();

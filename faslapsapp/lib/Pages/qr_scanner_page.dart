@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import 'connection_page.dart';
+import 'race_monitor_page.dart';
 
 Uri buildWebSocketUri(String input) {
   final trimmedInput = input.trim();
@@ -68,7 +68,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ConnectionPage(
+          builder: (_) => RaceMonitorPage(
             serverAddress: uri.host,
           ),
         ),

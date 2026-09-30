@@ -1,27 +1,30 @@
+import 'package:faslapsapp/Widgets/fuel_bar.dart';
+import 'package:faslapsapp/Widgets/lap_time_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:faslapsapp/lap_data.dart';
 import 'package:faslapsapp/race_info.dart';
 import 'package:faslapsapp/services/background_race_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:faslapsapp/services/race_history_service.dart';
+import 'package:faslapsapp/Widgets/race_data_box.dart';
 
-class ConnectionPage extends StatefulWidget {
+class RaceMonitorPage extends StatefulWidget {
   final String serverAddress;
 
-  const ConnectionPage({super.key, required this.serverAddress});
+  const RaceMonitorPage({super.key, required this.serverAddress});
 
   @override
-  State<ConnectionPage> createState() => _ConnectionPageState();
+  State<RaceMonitorPage> createState() => _RaceMonitorPageState();
 }
 
-class _ConnectionPageState extends State<ConnectionPage> {
+class _RaceMonitorPageState extends State<RaceMonitorPage> {
   final List<LapData> raceHistory = [];
 
   RaceInfo? currentRaceInfo;
 
   String status = "Connecting...";
-  String raceName = "Waiting for Race Name";
-  String raceHeat = "Waiting for Race Heat";
+  String raceName = "Waiting for Race Info";
+  String raceHeat = "";
   bool raceInfoReceived = false;
 
   @override
@@ -140,7 +143,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
         if (!mounted) return;
 
         setState(() {
-          raceHistory.add(lapData);
+          raceHistory.insert(0, lapData);
         });
       } catch (e) {
         print("Error processing background lap data: $e");
@@ -159,13 +162,17 @@ class _ConnectionPageState extends State<ConnectionPage> {
           Map<String, dynamic>.from(raceInfoJson),
         );
 
-        if (raceInfoReceived)
-        {
-          RaceHistoryService.saveRace(currentRaceInfo!, raceHistory);
+        if (raceInfoReceived) {
+          RaceHistoryService.saveRace(
+            currentRaceInfo!,
+            raceHistory.reversed.toList(),
+          );
         }
 
         currentRaceInfo = raceInfo;
-        print ("CURRENT RACE INFO: ${currentRaceInfo?.raceName} - ${currentRaceInfo?.raceId}");
+        print(
+          "CURRENT RACE INFO: ${currentRaceInfo?.raceName} - ${currentRaceInfo?.raceId}",
+        );
         final existingRace = await RaceHistoryService.findRace(raceInfo.raceId);
 
         if (!mounted) return;
@@ -178,7 +185,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
           // If this race has been saved before, load its laps.
           raceHistory
             ..clear()
-            ..addAll(existingRace?.laps ?? []);
+            ..addAll(existingRace?.laps.reversed ?? []);
         });
 
         if (existingRace != null) {
@@ -249,7 +256,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
     }
 
     if (shouldSave && currentRaceInfo != null) {
-      await RaceHistoryService.saveRace(currentRaceInfo!, raceHistory);
+      await RaceHistoryService.saveRace(
+        currentRaceInfo!,
+        raceHistory.reversed.toList(),
+      );
 
       final savedRaces = await RaceHistoryService.loadRaces();
 
@@ -278,6 +288,19 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final lastLap = raceHistory.isNotEmpty
+        ? raceHistory[0].lapTimeSeconds
+        : 0.0;
+    final bestLap = raceHistory.isNotEmpty
+        ? raceHistory
+              .map((lap) => lap.lapTimeSeconds)
+              .reduce((a, b) => a < b ? a : b)
+        : 0.0;
+    final averageLap = raceHistory.isNotEmpty
+        ? raceHistory.map((lap) => lap.lapTimeSeconds).reduce((a, b) => a + b) /
+              raceHistory.length
+        : 0.0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Race Monitor"),
@@ -294,102 +317,142 @@ class _ConnectionPageState extends State<ConnectionPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Text(raceName, style: Theme.of(context).textTheme.titleLarge),
-                Text(" - ", style: Theme.of(context).textTheme.titleLarge),
-                Text(raceHeat, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "Status: $status",
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: status == 'Connected' ? Colors.green : Colors.red,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        raceName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        " - ",
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        raceHeat,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+
+                  Center(
                     child: Text(
-                      "Lap",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      "Status: $status",
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: status == 'Connected'
+                            ? Colors.green
+                            : Colors.red,
+                      ),
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      "Lap Time",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: RaceDataBox(
+                      title: "Elapsed Time / Time Left",
+                      value: "1:30",
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      "Best Lap",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: RaceDataBox(
+                          title: "Current Lap",
+                          value:
+                              "${raceHistory.isNotEmpty ? raceHistory[0].lapNumber : 0}",
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: RaceDataBox(
+                          title: "Postion",
+                          value:
+                              "${raceHistory.isNotEmpty ? raceHistory[0].racePosition : 0}",
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: RaceDataBox(
+                          title: "Time from lead",
+                          value: ".223 s",
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: Text(
-                      "Position",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+
+                  const SizedBox(height: 10),
+
+                  FuelBar(fuelAmount: 100),
+
+                  const SizedBox(height: 12),
+
+                  LapTimeBar(
+                    title: "Last Lap",
+                    value: "${lastLap.toStringAsFixed(3)} s",
+                    firstColor: Colors.green,
+                    secondColor: const Color.fromARGB(255, 45, 227, 139),
                   ),
+
+                  LapTimeBar(
+                    title: "Best Lap",
+                    value: "${bestLap.toStringAsFixed(3)} s",
+                    firstColor: Colors.red,
+                    secondColor: Colors.redAccent,
+                  ),
+
+                  LapTimeBar(
+                    title: "Average Lap",
+                    value: "${averageLap.toStringAsFixed(3)} s",
+                    firstColor: Colors.blue,
+                    secondColor: Colors.blueAccent,
+                  ),
+
+                  // Your lap history ListView can eventually go here.
+                  //
+                  // Expanded(
+                  //   child: ListView.builder(...)
+                  // ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount: raceHistory.length,
-                itemBuilder: (context, index) {
-                  final lap = raceHistory[index];
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 3),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              "${lap.lapNumber}",
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              lap.lapTimeSeconds.toStringAsFixed(3),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              lap.bestLapTimeSeconds.toStringAsFixed(3),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              "${lap.racePosition}",
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+            const SizedBox(height: 12),
+
+            // This stays at the bottom of the screen.
+            SizedBox(
+              width: double.infinity,
+              height: 60,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  // TODO: Tell the server to stop the race
                 },
+                icon: const Icon(Icons.stop, size: 28),
+                label: const Text(
+                  "PAUSE RACE",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade800,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ),
           ],

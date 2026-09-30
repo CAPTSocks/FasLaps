@@ -8,7 +8,8 @@ class PracticeRaceHistoryPage extends StatefulWidget {
   const PracticeRaceHistoryPage({super.key});
 
   @override
-  State<PracticeRaceHistoryPage> createState() => _PracticeRaceHistoryPageState();
+  State<PracticeRaceHistoryPage> createState() =>
+      _PracticeRaceHistoryPageState();
 }
 
 class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
@@ -153,6 +154,10 @@ class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
         return ListTile(
           title: Text(
             race.raceName.isEmpty ? "Race ${index + 1}" : race.raceName,
+          ),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: Colors.orange, width: 1.5),
+            borderRadius: BorderRadius.circular(8),
           ),
           subtitle: Text("${race.laps.length} laps"),
           trailing: Row(
