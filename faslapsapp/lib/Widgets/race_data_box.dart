@@ -12,9 +12,11 @@ class RaceDataBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasTitle = title.isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: 14,
+      padding: EdgeInsets.symmetric(
+        vertical: hasTitle ? 14 : 20,
         horizontal: 8,
       ),
       decoration: BoxDecoration(
@@ -26,31 +28,37 @@ class RaceDataBox extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color.fromARGB(255, 224, 87, 7),
-          width: 1.5,
-        ),
       ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+      child: Center(
+        child: hasTitle
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              )
+            : Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 46,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }

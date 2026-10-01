@@ -8,48 +8,75 @@ class FuelBar extends StatelessWidget {
     required this.fuelAmount,
   });
 
-@override
+  @override
   Widget build(BuildContext context) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "FUEL",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
+    final int activeBars = (fuelAmount / 10).ceil();
+
+    final Color fuelColor = fuelAmount > 50
+        ? Colors.green
+        : fuelAmount > 20
+            ? Colors.orange
+            : Colors.red;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "FUEL",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                fontSize: 16,
+              ),
+            ),
+            Text(
+              "$fuelAmount%",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+
+        // Background behind all 10 fuel bars
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF202020),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: const Color.fromARGB(255, 74, 74, 74),
+              width: 3,
             ),
           ),
-          Text(
-            "${fuelAmount.toStringAsFixed(0)}%",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+          child: Row(
+            children: List.generate(10, (index) {
+              final bool isActive = index < activeBars;
 
-      const SizedBox(height: 6),
-
-      ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: LinearProgressIndicator(
-          value: fuelAmount / 100,
-          minHeight: 40,
-          backgroundColor: const Color(0xFF303030),
-          valueColor: AlwaysStoppedAnimation<Color>(
-            fuelAmount > 50
-                ? Colors.blue
-                : fuelAmount > 20
-                    ? Colors.orange
-                    : Colors.red,
+              return Expanded(
+                child: Container(
+                  height: 50,
+                  margin: EdgeInsets.only(
+                    right: index == 9 ? 0 : 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? fuelColor
+                        : const Color(0xFF303030),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 }

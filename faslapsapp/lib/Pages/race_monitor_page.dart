@@ -26,6 +26,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   String raceName = "Waiting for Race Info";
   String raceHeat = "";
   bool raceInfoReceived = false;
+  int fuelAmount = 100;
 
   @override
   void initState() {
@@ -306,7 +307,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         title: const Text("Race Monitor"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.stop),
+            icon: const Icon(Icons.close),
             tooltip: "Stop Race",
             onPressed: _stopRace,
           ),
@@ -353,8 +354,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
+                    height: 90,
                     child: RaceDataBox(
-                      title: "Elapsed Time / Time Left",
+                      title: "",
                       value: "1:30",
                     ),
                   ),
@@ -374,7 +376,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
                       Expanded(
                         child: RaceDataBox(
-                          title: "Postion",
+                          title: "Position",
                           value:
                               "${raceHistory.isNotEmpty ? raceHistory[0].racePosition : 0}",
                         ),
@@ -385,7 +387,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       Expanded(
                         child: RaceDataBox(
                           title: "Time from lead",
-                          value: ".223 s",
+                          value: ".223",
                         ),
                       ),
                     ],
@@ -393,27 +395,27 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
                   const SizedBox(height: 10),
 
-                  FuelBar(fuelAmount: 100),
+                  FuelBar(fuelAmount: fuelAmount),
 
-                  const SizedBox(height: 12),
-
+                  const SizedBox(height: 36),
+                  
                   LapTimeBar(
                     title: "Last Lap",
-                    value: "${lastLap.toStringAsFixed(3)} s",
-                    firstColor: Colors.green,
-                    secondColor: const Color.fromARGB(255, 45, 227, 139),
+                    value: lastLap.toStringAsFixed(3),
+                    firstColor: Colors.deepOrange,
+                    secondColor: const Color.fromARGB(255, 255, 120, 78),
                   ),
 
                   LapTimeBar(
                     title: "Best Lap",
-                    value: "${bestLap.toStringAsFixed(3)} s",
+                    value: bestLap.toStringAsFixed(3),
                     firstColor: Colors.red,
                     secondColor: Colors.redAccent,
                   ),
 
                   LapTimeBar(
                     title: "Average Lap",
-                    value: "${averageLap.toStringAsFixed(3)} s",
+                    value: averageLap.toStringAsFixed(3),
                     firstColor: Colors.blue,
                     secondColor: Colors.blueAccent,
                   ),
@@ -432,12 +434,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
             // This stays at the bottom of the screen.
             SizedBox(
               width: double.infinity,
-              height: 60,
+              height: 125,
               child: ElevatedButton.icon(
                 onPressed: () {
                   // TODO: Tell the server to stop the race
                 },
-                icon: const Icon(Icons.stop, size: 28),
+                icon: const Icon(Icons.pause, size: 28),
                 label: const Text(
                   "PAUSE RACE",
                   style: TextStyle(

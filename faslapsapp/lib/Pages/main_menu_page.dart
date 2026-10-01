@@ -3,6 +3,7 @@ import 'qr_scanner_page.dart';
 import 'settings_page.dart';
 import 'package:faslapsapp/pages/race_history_page.dart';
 import 'package:faslapsapp/Pages/practice_race_history_page.dart';
+import '../services/notification_service.dart';
 
 class MainMenuPage extends StatelessWidget {
   final String firstName;
@@ -16,7 +17,6 @@ class MainMenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     String newfirstName = firstName[0].toUpperCase() + firstName.substring(1);
     String newLastName = lastName[0].toUpperCase() + lastName.substring(1);
     double buttonSpace = 8.0;
@@ -33,7 +33,7 @@ class MainMenuPage extends StatelessWidget {
             ),
 
             const SizedBox(height: 30),
-            
+
             FilledButton.icon(
               icon: const Icon(Icons.qr_code_scanner),
               label: const Text("Connect To Race"),
@@ -96,6 +96,13 @@ class MainMenuPage extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => SettingsPage()),
                 );
               },
+            ),
+
+            ElevatedButton(
+              onPressed: () async {
+                await NotificationService.instance.showTestNotification();
+              },
+              child: const Text('Test Notification'),
             ),
           ],
         ),

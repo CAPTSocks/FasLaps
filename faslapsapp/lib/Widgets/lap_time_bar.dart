@@ -17,9 +17,9 @@ class LapTimeBar extends StatelessWidget {
 @override
  Widget build(BuildContext context) {
   return Container(
-    margin: const EdgeInsets.only(bottom: 8),
+    margin: const EdgeInsets.only(bottom: 6),
     padding: const EdgeInsets.symmetric(
-      vertical: 10,
+      vertical: 7,
       horizontal: 14,
     ),
     decoration: BoxDecoration(
@@ -31,11 +31,7 @@ class LapTimeBar extends StatelessWidget {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-        color: const Color(0xFF168BFF),
-        width: 1.5,
-      ),
+    borderRadius: BorderRadius.circular(8),
     ),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
