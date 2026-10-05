@@ -9,6 +9,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:faslapsapp/lap_data.dart';
 import 'package:faslapsapp/race_info.dart';
 import 'package:faslapsapp/services/tts_service.dart';
+import 'package:faslapsapp/fuel_data.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -24,6 +25,11 @@ class RaceTaskHandler extends TaskHandler {
   final TtsService _ttsService = TtsService.instance;
 
   bool _isConnecting = false;
+
+  bool _readLastLap = true;
+  bool _readBestLap = true;
+  bool _readAverageLap = true;
+  bool _readFuel = true;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -83,6 +89,23 @@ class RaceTaskHandler extends TaskHandler {
 
     if (type == 'getRaceHistory') {
       _sendRaceHistoryToMain();
+
+      return;
+    }
+
+    if (type == 'ttsSettings') {
+      _readLastLap = data['lastLap'] ?? true;
+      _readBestLap = data['bestLap'] ?? true;
+      _readAverageLap = data['averageLap'] ?? true;
+      _readFuel = data['fuel'] ?? true;
+
+      print(
+        "TTS settings updated: "
+        "Last Lap=$_readLastLap, "
+        "Best Lap=$_readBestLap, "
+        "Average Lap=$_readAverageLap, "
+        "Fuel=$_readFuel",
+      );
 
       return;
     }
@@ -229,6 +252,10 @@ class RaceTaskHandler extends TaskHandler {
           _handleRaceInfo(jsonData);
           break;
 
+        case 'fuelData':
+          _handleFuelData(jsonData);
+          break;
+
         default:
           print("Unknown message type received: $messageType");
           break;
@@ -240,7 +267,7 @@ class RaceTaskHandler extends TaskHandler {
     }
   }
 
-  void _handleLapData(Map<String, dynamic> jsonData) {
+  void _handleLapData(Map<String, dynamic> jsonData) async {
     try {
       final lapData = LapData.fromJson(jsonData);
 
@@ -251,28 +278,64 @@ class RaceTaskHandler extends TaskHandler {
         'lapData': lapData.toJson(),
       });
 
-      _ttsService.announceLap(lapData);
+      // Calculate the average lap.
+      final averageLap =
+          _raceHistory
+              .map((lap) => lap.lapTimeSeconds)
+              .reduce((a, b) => a + b) /
+          _raceHistory.length;
+
+      final bestLap = _raceHistory
+          .map((lap) => lap.lapTimeSeconds)
+          .reduce((a, b) => a < b ? a : b);
+
+      await _ttsService.announceLapStats(
+        lap: lapData,
+        bestLap: bestLap,
+        averageLap: averageLap,
+        readLastLap: _readLastLap,
+        readBestLap: _readBestLap,
+        readAverageLap: _readAverageLap,
+      );
     } catch (e, stack) {
       print("Error handling lap data:");
       print(e);
       print(stack);
     }
   }
-}
 
-void _handleRaceInfo(Map<String, dynamic> jsonData) {
-  try {
-    final raceInfo = RaceInfo.fromJson(jsonData);
+  void _handleRaceInfo(Map<String, dynamic> jsonData) {
+    try {
+      final raceInfo = RaceInfo.fromJson(jsonData);
 
-    FlutterForegroundTask.sendDataToMain({
-      'type': 'raceInfo',
-      'raceInfo': raceInfo.toJson(),
-    });
-    
-  } catch (e, stack) {
-    print("Error handling race info:");
-    print(e);
-    print(stack);
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'raceInfo',
+        'raceInfo': raceInfo.toJson(),
+      });
+    } catch (e, stack) {
+      print("Error handling race info:");
+      print(e);
+      print(stack);
+    }
+  }
+
+  void _handleFuelData(Map<String, dynamic> jsonData) async {
+    try {
+      final fuelData = FuelData.fromJson(jsonData);
+
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'fuelData',
+        'fuelData': fuelData.toJson(),
+      });
+
+      if (_readFuel) {
+        await _ttsService.announceFuel(fuelData.fuelLevel);
+      }
+    } catch (e, stack) {
+      print("Error handling fuel data:");
+      print(e);
+      print(stack);
+    }
   }
 }
 
@@ -300,6 +363,21 @@ class BackgroundRaceService {
     );
 
     print("Foreground service result: $result");
+  }
+
+  static void setTTSSettings({
+    required bool lastLap,
+    required bool bestLap,
+    required bool averageLap,
+    required bool fuel,
+  }) {
+    FlutterForegroundTask.sendDataToTask({
+      'type': 'ttsSettings',
+      'lastLap': lastLap,
+      'bestLap': bestLap,
+      'averageLap': averageLap,
+      'fuel': fuel,
+    });
   }
 
   static void sendServerAddress(String serverAddress) {

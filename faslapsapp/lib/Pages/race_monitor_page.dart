@@ -7,6 +7,7 @@ import 'package:faslapsapp/services/background_race_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:faslapsapp/services/race_history_service.dart';
 import 'package:faslapsapp/Widgets/race_data_box.dart';
+import 'package:faslapsapp/fuel_data.dart';
 
 class RaceMonitorPage extends StatefulWidget {
   final String serverAddress;
@@ -27,6 +28,19 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   String raceHeat = "";
   bool raceInfoReceived = false;
   int fuelAmount = 100;
+  bool readLastLap = true;
+  bool readBestLap = true;
+  bool readAverageLap = true;
+  bool readFuel = true;
+
+  void _updateTTSSettings() {
+    BackgroundRaceService.setTTSSettings(
+      lastLap: readLastLap,
+      bestLap: readBestLap,
+      averageLap: readAverageLap,
+      fuel: readFuel,
+    );
+  }
 
   @override
   void initState() {
@@ -206,6 +220,26 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         print(stackTrace);
       }
     }
+
+    if (type == 'fuelData') {
+      final fuelDataJson = data['fuelData'];
+
+      if (fuelDataJson is! Map<String, dynamic>) {
+        return;
+      }
+
+      try {
+        final fuelData = FuelData.fromJson(fuelDataJson);
+
+        if (!mounted) return;
+
+        setState(() {
+          fuelAmount = fuelData.fuelLevel;
+        });
+      } catch (e) {
+        print("Error processing background fuel data: $e");
+      }
+    }
   }
 
   Future<void> _stopRace() async {
@@ -287,6 +321,88 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
+  Widget _buildLapTimeRow({
+    required String title,
+    required String value,
+    required Color firstColor,
+    required Color secondColor,
+    required bool isTtsEnabled,
+    required VoidCallback onTtsToggle,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: LapTimeBar(
+            title: title,
+            value: value,
+            firstColor: firstColor,
+            secondColor: secondColor,
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        Container(
+          width: 70,
+          height: 70,
+          margin: EdgeInsets.only(bottom: 8),
+          child: IconButton(
+            onPressed: onTtsToggle,
+            icon: Icon(isTtsEnabled ? Icons.volume_up : Icons.volume_off),
+            color: Colors.white,
+            tooltip: isTtsEnabled ? "Disable TTS" : "Enable TTS",
+            style: IconButton.styleFrom(
+              backgroundColor: isTtsEnabled
+                  ? Colors.green.shade700
+                  : Colors.grey.shade700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFuelRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: FuelBar(fuelAmount: fuelAmount)),
+
+        const SizedBox(width: 8),
+
+        Container(
+          width: 70,
+          height: 65,
+          margin: const EdgeInsets.only(top: 27),
+          child: IconButton(
+            onPressed: () {
+              setState(() {
+                readFuel = !readFuel;
+                _updateTTSSettings();
+              });
+            },
+            icon: Icon(readFuel ? Icons.volume_up : Icons.volume_off),
+            color: Colors.white,
+            tooltip: readFuel ? "Disable TTS" : "Enable TTS",
+            style: IconButton.styleFrom(
+              backgroundColor: readFuel
+                  ? Colors.green.shade700
+                  : Colors.grey.shade700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              
+            ),
+            
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final lastLap = raceHistory.isNotEmpty
@@ -355,10 +471,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                   SizedBox(
                     width: double.infinity,
                     height: 90,
-                    child: RaceDataBox(
-                      title: "",
-                      value: "1:30",
-                    ),
+                    child: RaceDataBox(title: "", value: "1:30"),
                   ),
                   const SizedBox(height: 10),
 
@@ -395,29 +508,53 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
                   const SizedBox(height: 10),
 
-                  FuelBar(fuelAmount: fuelAmount),
+                  _buildFuelRow(),
 
                   const SizedBox(height: 36),
-                  
-                  LapTimeBar(
+
+                  _buildLapTimeRow(
                     title: "Last Lap",
                     value: lastLap.toStringAsFixed(3),
                     firstColor: Colors.deepOrange,
                     secondColor: const Color.fromARGB(255, 255, 120, 78),
+                    isTtsEnabled: readLastLap,
+                    onTtsToggle: () {
+                      setState(() {
+                        readLastLap = !readLastLap;
+                      });
+
+                      _updateTTSSettings();
+                    },
                   ),
 
-                  LapTimeBar(
+                  _buildLapTimeRow(
                     title: "Best Lap",
                     value: bestLap.toStringAsFixed(3),
                     firstColor: Colors.red,
                     secondColor: Colors.redAccent,
+                    isTtsEnabled: readBestLap,
+                    onTtsToggle: () {
+                      setState(() {
+                        readBestLap = !readBestLap;
+                      });
+
+                      _updateTTSSettings();
+                    },
                   ),
 
-                  LapTimeBar(
+                  _buildLapTimeRow(
                     title: "Average Lap",
                     value: averageLap.toStringAsFixed(3),
                     firstColor: Colors.blue,
                     secondColor: Colors.blueAccent,
+                    isTtsEnabled: readAverageLap,
+                    onTtsToggle: () {
+                      setState(() {
+                        readAverageLap = !readAverageLap;
+                      });
+
+                      _updateTTSSettings();
+                    },
                   ),
 
                   // Your lap history ListView can eventually go here.

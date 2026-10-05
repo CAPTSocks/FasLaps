@@ -14,45 +14,45 @@ class LapTimeBar extends StatelessWidget {
     required this.secondColor,
   });
 
-@override
- Widget build(BuildContext context) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 6),
-    padding: const EdgeInsets.symmetric(
-      vertical: 7,
-      horizontal: 14,
-    ),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          firstColor,
-          secondColor,
-        ],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(
+        vertical: 7,
+        horizontal: 14,
       ),
-    borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            firstColor,
+            secondColor,
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.bold,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
