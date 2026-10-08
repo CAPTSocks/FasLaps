@@ -1,5 +1,4 @@
 import 'package:faslapsapp/Widgets/fuel_bar.dart';
-import 'package:faslapsapp/Widgets/lap_time_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:faslapsapp/lap_data.dart';
 import 'package:faslapsapp/race_info.dart';
@@ -8,6 +7,9 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:faslapsapp/services/race_history_service.dart';
 import 'package:faslapsapp/Widgets/race_data_box.dart';
 import 'package:faslapsapp/fuel_data.dart';
+import 'package:faslapsapp/Widgets/race_header.dart';
+import 'package:faslapsapp/Widgets/race_stats_row.dart';
+import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
 
 class RaceMonitorPage extends StatefulWidget {
   final String serverAddress;
@@ -81,241 +83,235 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   }
 
   void _onReceiveTaskData(Object data) async {
-  print("UI received from background: $data");
+    print("UI received from background: $data");
 
-  if (data is! Map) return;
+    if (data is! Map) return;
 
-  final type = data['type'];
+    final type = data['type'];
 
-  switch (type) {
-    case 'connectionStatus':
-      _handleConnectionStatus(data);
-      break;
-
-    case 'raceHistory':
-      await _handleRaceHistory(data);
-      break;
-
-    case 'lapData':
-      _handleLapData(data);
-      break;
-
-    case 'raceInfo':
-      await _handleRaceInfo(data);
-      break;
-
-    case 'startRace':
-      _handleStartRace();
-      break;
-
-    case 'fuelData':
-      _handleFuelData(data);
-      break;
-
-    default:
-      print("Unknown message type received: $type");
-  }
-}
-
-void _handleConnectionStatus(Map data) {
-  final connectionStatus = data['status'];
-
-  if (!mounted) return;
-
-  setState(() {
-    switch (connectionStatus) {
-      case 'connected':
-        status = "Connected";
+    switch (type) {
+      case 'connectionStatus':
+        _handleConnectionStatus(data);
         break;
 
-      case 'disconnected':
-        status = "Disconnected";
+      case 'raceHistory':
+        await _handleRaceHistory(data);
         break;
 
-      case 'error':
-        status = "Connection Error";
+      case 'lapData':
+        _handleLapData(data);
         break;
+
+      case 'raceInfo':
+        await _handleRaceInfo(data);
+        break;
+
+      case 'startRace':
+        _handleStartRace();
+        break;
+
+      case 'fuelData':
+        _handleFuelData(data);
+        break;
+
+      default:
+        print("Unknown message type received: $type");
     }
-  });
-}
-
-void _handleStartRace() {
-  if (!mounted) return;
-
-  setState(() {
-    isRacePaused = false;
-  });
-}
-
-void _handleLapData(Map data) {
-  final lapDataJson = data['lapData'];
-
-  if (lapDataJson is! Map) {
-    return;
   }
 
-  try {
-    final lapData = LapData.fromJson(
-      Map<String, dynamic>.from(lapDataJson),
-    );
+  void _handleConnectionStatus(Map data) {
+    final connectionStatus = data['status'];
 
     if (!mounted) return;
 
     setState(() {
-      raceHistory.insert(0, lapData);
+      switch (connectionStatus) {
+        case 'connected':
+          status = "Connected";
+          break;
+
+        case 'disconnected':
+          status = "Disconnected";
+          break;
+
+        case 'error':
+          status = "Connection Error";
+          break;
+      }
     });
-  } catch (e) {
-    print("Error processing background lap data: $e");
-  }
-}
-
-Future<void> _handleRaceHistory(Map data) async {
-  final history = data['history'];
-
-  if (history is! List) {
-    return;
   }
 
-  try {
-    final loadedHistory = history.whereType<Map>().map((lapJson) {
-      return LapData.fromJson(
-        Map<String, dynamic>.from(lapJson),
-      );
-    }).toList();
-
+  void _handleStartRace() {
     if (!mounted) return;
 
     setState(() {
-      raceHistory
-        ..clear()
-        ..addAll(loadedHistory);
+      isRacePaused = false;
     });
-
-    print(
-      "Loaded ${raceHistory.length} laps "
-      "from background service",
-    );
-  } catch (e, stackTrace) {
-    print("Error loading race history:");
-    print(e);
-    print(stackTrace);
-  }
-}
-
-Future<void> _handleRaceInfo(Map data) async {
-  final raceInfoJson = data['raceInfo'];
-
-  if (raceInfoJson is! Map) {
-    return;
   }
 
-  try {
-    final raceInfo = RaceInfo.fromJson(
-      Map<String, dynamic>.from(raceInfoJson),
-    );
+  void _handleLapData(Map data) {
+    final lapDataJson = data['lapData'];
 
-    // Save the previous race before switching to the new one.
-    if (raceInfoReceived && currentRaceInfo != null) {
-      await RaceHistoryService.saveRace(
-        currentRaceInfo!,
-        raceHistory.reversed.toList(),
-      );
+    if (lapDataJson is! Map) {
+      return;
     }
 
-    currentRaceInfo = raceInfo;
+    try {
+      final lapData = LapData.fromJson(Map<String, dynamic>.from(lapDataJson));
 
-    print(
-      "CURRENT RACE INFO: "
-      "${currentRaceInfo?.raceName} - "
-      "${currentRaceInfo?.raceId}",
-    );
+      if (!mounted) return;
 
-    final existingRace = await RaceHistoryService.findRace(
-      raceInfo.raceId,
-    );
+      setState(() {
+        raceHistory.insert(0, lapData);
+      });
+    } catch (e) {
+      print("Error processing background lap data: $e");
+    }
+  }
 
-    if (!mounted) return;
+  Future<void> _handleRaceHistory(Map data) async {
+    final history = data['history'];
 
-    setState(() {
-      raceName = raceInfo.raceName;
-      raceHeat = raceInfo.raceHeat;
-      raceInfoReceived = true;
+    if (history is! List) {
+      return;
+    }
 
-      raceHistory
-        ..clear()
-        ..addAll(existingRace?.laps.reversed ?? []);
-    });
+    try {
+      final loadedHistory = history.whereType<Map>().map((lapJson) {
+        return LapData.fromJson(Map<String, dynamic>.from(lapJson));
+      }).toList();
 
-    if (existingRace != null) {
+      if (!mounted) return;
+
+      setState(() {
+        raceHistory
+          ..clear()
+          ..addAll(loadedHistory);
+      });
+
       print(
-        "Found existing race ${raceInfo.raceId} "
-        "with ${existingRace.laps.length} laps.",
+        "Loaded ${raceHistory.length} laps "
+        "from background service",
       );
-    } else {
-      print(
-        "No saved race found for ${raceInfo.raceId}. "
-        "Starting with empty history.",
-      );
+    } catch (e, stackTrace) {
+      print("Error loading race history:");
+      print(e);
+      print(stackTrace);
     }
-  } catch (e, stackTrace) {
-    print("Error processing background race info:");
-    print(e);
-    print(stackTrace);
-  }
-}
-
-void _handleFuelData(Map data) {
-  final fuelDataJson = data['fuelData'];
-
-  if (fuelDataJson is! Map) {
-    return;
   }
 
-  try {
-    final fuelData = FuelData.fromJson(
-      Map<String, dynamic>.from(fuelDataJson),
+  Future<void> _handleRaceInfo(Map data) async {
+    final raceInfoJson = data['raceInfo'];
+
+    if (raceInfoJson is! Map) {
+      return;
+    }
+
+    try {
+      final raceInfo = RaceInfo.fromJson(
+        Map<String, dynamic>.from(raceInfoJson),
+      );
+
+      // Save the previous race before switching to the new one.
+      if (raceInfoReceived && currentRaceInfo != null) {
+        await RaceHistoryService.saveRace(
+          currentRaceInfo!,
+          raceHistory.reversed.toList(),
+        );
+      }
+
+      currentRaceInfo = raceInfo;
+
+      print(
+        "CURRENT RACE INFO: "
+        "${currentRaceInfo?.raceName} - "
+        "${currentRaceInfo?.raceId}",
+      );
+
+      final existingRace = await RaceHistoryService.findRace(raceInfo.raceId);
+
+      if (!mounted) return;
+
+      setState(() {
+        raceName = raceInfo.raceName;
+        raceHeat = raceInfo.raceHeat;
+        raceInfoReceived = true;
+
+        raceHistory
+          ..clear()
+          ..addAll(existingRace?.laps.reversed ?? []);
+      });
+
+      if (existingRace != null) {
+        print(
+          "Found existing race ${raceInfo.raceId} "
+          "with ${existingRace.laps.length} laps.",
+        );
+      } else {
+        print(
+          "No saved race found for ${raceInfo.raceId}. "
+          "Starting with empty history.",
+        );
+      }
+    } catch (e, stackTrace) {
+      print("Error processing background race info:");
+      print(e);
+      print(stackTrace);
+    }
+  }
+
+  void _handleFuelData(Map data) {
+    final fuelDataJson = data['fuelData'];
+
+    if (fuelDataJson is! Map) {
+      return;
+    }
+
+    try {
+      final fuelData = FuelData.fromJson(
+        Map<String, dynamic>.from(fuelDataJson),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        fuelAmount = fuelData.fuelLevel;
+      });
+    } catch (e) {
+      print("Error processing background fuel data: $e");
+    }
+  }
+
+  double get lastLap {
+    if (raceHistory.isEmpty) {
+      return 0.0;
+    }
+
+    return raceHistory.first.lapTimeSeconds;
+  }
+
+  double _calculateBestLap() {
+    if (raceHistory.isEmpty) {
+      return 0.0;
+    }
+
+    return raceHistory
+        .map((lap) => lap.lapTimeSeconds)
+        .reduce((a, b) => a < b ? a : b);
+  }
+
+  double _calculateAverageLap() {
+    if (raceHistory.isEmpty) {
+      return 0.0;
+    }
+
+    final total = raceHistory.fold<double>(
+      0.0,
+      (sum, lap) => sum + lap.lapTimeSeconds,
     );
 
-    if (!mounted) return;
-
-    setState(() {
-      fuelAmount = fuelData.fuelLevel;
-    });
-  } catch (e) {
-    print("Error processing background fuel data: $e");
+    return total / raceHistory.length;
   }
-}
-
-double get lastLap {
-  if (raceHistory.isEmpty) {
-    return 0.0;
-  }
-
-  return raceHistory.first.lapTimeSeconds;
-}
-
-double _calculateBestLap() {
-  if (raceHistory.isEmpty) {
-    return 0.0;
-  }
-
-  return raceHistory
-      .map((lap) => lap.lapTimeSeconds)
-      .reduce((a, b) => a < b ? a : b);
-}
-
-double _calculateAverageLap() {
-  if (raceHistory.isEmpty) {
-    return 0.0;
-  }
-
-  final total = raceHistory.fold<double>(
-    0.0,
-    (sum, lap) => sum + lap.lapTimeSeconds,
-  );
-
-  return total / raceHistory.length;
-}
 
   Future<void> _stopRace() async {
     final shouldSave = await showDialog<bool>(
@@ -396,89 +392,8 @@ double _calculateAverageLap() {
     }
   }
 
-  Widget _buildLapTimeRow({
-    required String title,
-    required String value,
-    required Color firstColor,
-    required Color secondColor,
-    required bool isTtsEnabled,
-    required VoidCallback onTtsToggle,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: LapTimeBar(
-            title: title,
-            value: value,
-            firstColor: firstColor,
-            secondColor: secondColor,
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        Container(
-          width: 70,
-          height: 70,
-          margin: EdgeInsets.only(bottom: 8),
-          child: IconButton(
-            onPressed: onTtsToggle,
-            icon: Icon(isTtsEnabled ? Icons.volume_up : Icons.volume_off),
-            color: Colors.white,
-            tooltip: isTtsEnabled ? "Disable TTS" : "Enable TTS",
-            style: IconButton.styleFrom(
-              backgroundColor: isTtsEnabled
-                  ? Colors.green.shade700
-                  : Colors.grey.shade700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFuelRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: FuelBar(fuelAmount: fuelAmount)),
-
-        const SizedBox(width: 8),
-
-        Container(
-          width: 70,
-          height: 65,
-          margin: const EdgeInsets.only(top: 27),
-          child: IconButton(
-            onPressed: () {
-              setState(() {
-                readFuel = !readFuel;
-                _updateTTSSettings();
-              });
-            },
-            icon: Icon(readFuel ? Icons.volume_up : Icons.volume_off),
-            color: Colors.white,
-            tooltip: readFuel ? "Disable TTS" : "Enable TTS",
-            style: IconButton.styleFrom(
-              backgroundColor: readFuel
-                  ? Colors.green.shade700
-                  : Colors.grey.shade700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Race Monitor"),
@@ -499,33 +414,10 @@ double _calculateAverageLap() {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        raceName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        " - ",
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        raceHeat,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-
-                  Center(
-                    child: Text(
-                      "Status: $status",
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: status == 'Connected'
-                            ? Colors.green
-                            : Colors.red,
-                      ),
-                    ),
+                  RaceHeader(
+                    raceName: raceName,
+                    raceHeat: raceHeat,
+                    status: status,
                   ),
 
                   const SizedBox(height: 10),
@@ -536,44 +428,33 @@ double _calculateAverageLap() {
                   ),
                   const SizedBox(height: 10),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RaceDataBox(
-                          title: "Current Lap",
-                          value:
-                              "${raceHistory.isNotEmpty ? raceHistory[0].lapNumber : 0}",
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      Expanded(
-                        child: RaceDataBox(
-                          title: "Position",
-                          value:
-                              "${raceHistory.isNotEmpty ? raceHistory[0].racePosition : 0}",
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      Expanded(
-                        child: RaceDataBox(
-                          title: "Time from lead",
-                          value: ".223",
-                        ),
-                      ),
-                    ],
+                  RaceStatsRow(
+                    currentLap: raceHistory.isNotEmpty
+                        ? raceHistory.first.lapNumber
+                        : 0,
+                    position: raceHistory.isNotEmpty
+                        ? raceHistory.first.racePosition
+                        : 0,
+                    timeFromLead: ".223",
                   ),
 
                   const SizedBox(height: 10),
 
-                  _buildFuelRow(),
+                  FuelBar(
+                    fuelAmount: fuelAmount,
+                    isTtsEnabled: readFuel,
+                    onTtsToggle: () {
+                      setState(() {
+                        readFuel = !readFuel;
+                      });
+
+                      _updateTTSSettings();
+                    },
+                  ),
 
                   const SizedBox(height: 36),
 
-                  _buildLapTimeRow(
+                  LapTimeTtsRow(
                     title: "Last Lap",
                     value: lastLap.toStringAsFixed(3),
                     firstColor: Colors.deepOrange,
@@ -583,12 +464,11 @@ double _calculateAverageLap() {
                       setState(() {
                         readLastLap = !readLastLap;
                       });
-
                       _updateTTSSettings();
                     },
                   ),
 
-                  _buildLapTimeRow(
+                  LapTimeTtsRow(
                     title: "Best Lap",
                     value: _calculateBestLap().toStringAsFixed(3),
                     firstColor: Colors.red,
@@ -598,12 +478,11 @@ double _calculateAverageLap() {
                       setState(() {
                         readBestLap = !readBestLap;
                       });
-
                       _updateTTSSettings();
                     },
                   ),
 
-                  _buildLapTimeRow(
+                  LapTimeTtsRow(
                     title: "Average Lap",
                     value: _calculateAverageLap().toStringAsFixed(3),
                     firstColor: Colors.blue,
@@ -613,7 +492,6 @@ double _calculateAverageLap() {
                       setState(() {
                         readAverageLap = !readAverageLap;
                       });
-
                       _updateTTSSettings();
                     },
                   ),
