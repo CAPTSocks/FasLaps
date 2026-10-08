@@ -3,6 +3,7 @@ class LapData {
   int lapNumber;
   double lapTimeSeconds;
   double bestLapTimeSeconds;
+  double behindLeaderSeconds;
   int racePosition;
 
   LapData({
@@ -10,6 +11,7 @@ class LapData {
     required this.lapNumber,
     required this.lapTimeSeconds,
     required this.bestLapTimeSeconds,
+    required this.behindLeaderSeconds,
     required this.racePosition,
   });
 
@@ -19,6 +21,7 @@ class LapData {
       lapNumber: json['lapNumber'] as int,
       lapTimeSeconds: (json['lapTimeSeconds'] as num).toDouble(),
       bestLapTimeSeconds: (json['bestLapTimeSeconds'] as num).toDouble(),
+      behindLeaderSeconds: (json['behindLeaderSeconds'] as num).toDouble(),
       racePosition: json['racePosition'] as int,
     );
   }
@@ -29,6 +32,7 @@ class LapData {
       'lapNumber': lapNumber,
       'lapTimeSeconds': lapTimeSeconds,
       'bestLapTimeSeconds': bestLapTimeSeconds,
+      'behindLeaderSeconds': behindLeaderSeconds,
       'racePosition': racePosition,
     };
   }

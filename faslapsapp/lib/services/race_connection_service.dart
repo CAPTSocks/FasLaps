@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../lap_data.dart';
+import '../Models/lap_data.dart';
 import 'tts_service.dart';
 
 enum ConnectionStatus { connected, disconnected, connectionError }

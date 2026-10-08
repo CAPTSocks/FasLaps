@@ -1,5 +1,5 @@
 import 'package:flutter_tts/flutter_tts.dart';
-import '../lap_data.dart';
+import '../Models/lap_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TtsService {
@@ -50,46 +50,39 @@ class TtsService {
     await speak(speech);
   }
 
-Future<void> announceLapStats({
-  required LapData lap,
-  required double bestLap,
-  required double averageLap,
-  required bool readLastLap,
-  required bool readBestLap,
-  required bool readAverageLap,
-}) async {
-  final parts = <String>[];
+  Future<void> announceLapStats({
+    required LapData lap,
+    required double bestLap,
+    required double averageLap,
+    required bool readLastLap,
+    required bool readBestLap,
+    required bool readAverageLap,
+  }) async {
+    final parts = <String>[];
 
-  if (readLastLap) {
-    parts.add(
-      "Last lap ${lap.lapTimeSeconds.toStringAsFixed(2)} seconds.",
-    );
+    if (readLastLap) {
+      parts.add("Last lap ${lap.lapTimeSeconds.toStringAsFixed(2)} seconds.");
+    }
+
+    if (readBestLap && bestLap != lap.lapTimeSeconds) {
+      parts.add("Best lap ${bestLap.toStringAsFixed(2)} seconds.");
+      parts.add("Best lap ${bestLap.toStringAsFixed(2)} seconds.");
+    }
+
+    if (readAverageLap) {
+      parts.add("Average lap ${averageLap.toStringAsFixed(2)} seconds.");
+    }
+
+    if (parts.isEmpty) {
+      return;
+    }
+
+    await speak(parts.join(" "));
   }
 
-  if (readBestLap) {
-    parts.add(
-      "Best lap ${bestLap.toStringAsFixed(2)} seconds.",
-    );
+  Future<void> announceFuel(int fuelAmount) async {
+    await speak("Fuel $fuelAmount percent.");
   }
-
-  if (readAverageLap) {
-    parts.add(
-      "Average lap ${averageLap.toStringAsFixed(2)} seconds.",
-    );
-  }
-
-  if (parts.isEmpty) {
-    return;
-  }
-
-  await speak(parts.join(" "));
-}
-
-Future<void> announceFuel(int fuelAmount) async {
-  await speak(
-    "Fuel $fuelAmount percent.",
-  );
-}
 
   Future<void> setSpeechRate(double rate) async {
     final prefs = await SharedPreferences.getInstance();

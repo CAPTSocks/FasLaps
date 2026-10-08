@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../saved_race.dart';
+import '../Models/saved_race.dart';
 
 class RaceDetailsPage extends StatelessWidget {
   final SavedRace race;

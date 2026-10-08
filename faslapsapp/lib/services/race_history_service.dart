@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../lap_data.dart';
-import '../race_info.dart';
-import '../saved_race.dart';
+import '../Models/lap_data.dart';
+import '../Models/race_info.dart';
+import '../Models/saved_race.dart';
 
 class RaceHistoryService {
   static const String _storageKey = 'savedRaces';

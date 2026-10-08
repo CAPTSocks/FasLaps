@@ -1,15 +1,17 @@
 import 'package:faslapsapp/Widgets/fuel_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:faslapsapp/lap_data.dart';
-import 'package:faslapsapp/race_info.dart';
+import 'package:faslapsapp/Models/lap_data.dart';
+import 'package:faslapsapp/Models/race_info.dart';
+import 'package:faslapsapp/Models/race_time.dart';
 import 'package:faslapsapp/services/background_race_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:faslapsapp/services/race_history_service.dart';
 import 'package:faslapsapp/Widgets/race_data_box.dart';
-import 'package:faslapsapp/fuel_data.dart';
+import 'package:faslapsapp/Models/fuel_data.dart';
 import 'package:faslapsapp/Widgets/race_header.dart';
 import 'package:faslapsapp/Widgets/race_stats_row.dart';
 import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
+import 'dart:async';
 
 class RaceMonitorPage extends StatefulWidget {
   final String serverAddress;
@@ -24,6 +26,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   final List<LapData> raceHistory = [];
 
   RaceInfo? currentRaceInfo;
+  DateTime? raceStartTime;
+  Timer? _displayTimer;
+  Duration raceElapsed = Duration.zero;
 
   String status = "Connecting...";
   String raceName = "Waiting for Race Info";
@@ -69,6 +74,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     // Remove this page's listener.
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
 
+    _displayTimer?.cancel();
+
     // IMPORTANT:
     // Do NOT stop the race service here.
     //
@@ -112,6 +119,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       case 'fuelData':
         _handleFuelData(data);
+        break;
+
+      case 'raceTimeStart':
+        _handleStartTime(data);
         break;
 
       default:
@@ -282,6 +293,53 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
+ 
+void _handleStartTime(Map data) {
+  try {
+    final raceTime = RaceTime.fromJson(
+      Map<String, dynamic>.from(data),
+    );
+
+    _displayTimer?.cancel();
+
+    if (!mounted) return;
+
+    setState(() {
+      raceStartTime = raceTime.startTime;
+
+      final elapsed = DateTime.now().difference(raceStartTime!);
+      raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+    });
+
+    _displayTimer = Timer.periodic(
+      const Duration(milliseconds: 100),
+      (_) {
+        if (!mounted || raceStartTime == null) return;
+
+        final elapsed = DateTime.now().difference(raceStartTime!);
+
+        setState(() {
+          raceElapsed =
+              elapsed.isNegative ? Duration.zero : elapsed;
+        });
+      },
+    );
+  } catch (e) {
+    print("Error processing race start time: $e");
+  }
+}
+
+
+  String _formatElapsedTime(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    final centiseconds = (duration.inMilliseconds % 1000) ~/ 10;
+
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}.'
+        '${centiseconds.toString().padLeft(2, '0')}';
+  }
+
   double get lastLap {
     if (raceHistory.isEmpty) {
       return 0.0;
@@ -424,7 +482,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                   SizedBox(
                     width: double.infinity,
                     height: 90,
-                    child: RaceDataBox(title: "", value: "1:30"),
+                    child: RaceDataBox(
+                      title: "",
+                      value: _formatElapsedTime(raceElapsed),
+                    ),
                   ),
                   const SizedBox(height: 10),
 
@@ -435,7 +496,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                     position: raceHistory.isNotEmpty
                         ? raceHistory.first.racePosition
                         : 0,
-                    timeFromLead: ".223",
+                    timeFromLead: raceHistory.isNotEmpty
+                        ? "${raceHistory.first.behindLeaderSeconds.toStringAsFixed(3)}s"
+                        : "0.000s",
                   ),
 
                   const SizedBox(height: 10),

@@ -6,10 +6,11 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:faslapsapp/lap_data.dart';
-import 'package:faslapsapp/race_info.dart';
+import 'package:faslapsapp/Models/lap_data.dart';
+import 'package:faslapsapp/Models/race_info.dart';
 import 'package:faslapsapp/services/tts_service.dart';
-import 'package:faslapsapp/fuel_data.dart';
+import 'package:faslapsapp/Models/fuel_data.dart';
+import 'package:faslapsapp/Models/race_time.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -69,51 +70,50 @@ class RaceTaskHandler extends TaskHandler {
     }
   }
 
-@override
-void onReceiveData(Object data) {
-  print("Background service received: $data");
+  @override
+  void onReceiveData(Object data) {
+    print("Background service received: $data");
 
-  if (data is! Map) return;
+    if (data is! Map) return;
 
-  final type = data['type'];
+    final type = data['type'];
 
-  switch (type) {
-    case 'connect':
-      final serverAddress = data['serverAddress'];
+    switch (type) {
+      case 'connect':
+        final serverAddress = data['serverAddress'];
 
-      if (serverAddress is String) {
-        _connectToServer(serverAddress);
-      }
-      break;
+        if (serverAddress is String) {
+          _connectToServer(serverAddress);
+        }
+        break;
 
-    case 'getRaceHistory':
-      _sendRaceHistoryToMain();
-      break;
+      case 'getRaceHistory':
+        _sendRaceHistoryToMain();
+        break;
 
-    case 'ttsSettings':
-      _readLastLap = data['lastLap'] ?? true;
-      _readBestLap = data['bestLap'] ?? true;
-      _readAverageLap = data['averageLap'] ?? true;
-      _readFuel = data['fuel'] ?? true;
+      case 'ttsSettings':
+        _readLastLap = data['lastLap'] ?? true;
+        _readBestLap = data['bestLap'] ?? true;
+        _readAverageLap = data['averageLap'] ?? true;
+        _readFuel = data['fuel'] ?? true;
 
-      print(
-        "TTS settings updated: "
-        "Last Lap=$_readLastLap, "
-        "Best Lap=$_readBestLap, "
-        "Average Lap=$_readAverageLap, "
-        "Fuel=$_readFuel",
-      );
-      break;
+        print(
+          "TTS settings updated: "
+          "Last Lap=$_readLastLap, "
+          "Best Lap=$_readBestLap, "
+          "Average Lap=$_readAverageLap, "
+          "Fuel=$_readFuel",
+        );
+        break;
 
-    case 'pauseRace':
-      _pauseRace();
-      break;
-
-    default:
-      print("Unknown background command: $type");
-      break;
+      case 'pauseRace':
+        _pauseRace();
+        break;
+      default:
+        print("Unknown background command: $type");
+        break;
+    }
   }
-}
 
   void _sendRaceHistoryToMain() {
     final historyJson = _raceHistory.map((lap) {
@@ -234,21 +234,19 @@ void onReceiveData(Object data) {
   }
 
   void _pauseRace() {
-  if (_socketChannel == null) {
-    print("Cannot pause race: WebSocket is not connected.");
-    return;
+    if (_socketChannel == null) {
+      print("Cannot pause race: WebSocket is not connected.");
+      return;
+    }
+
+    final pauseMessage = {"type": "pauseRace"};
+
+    final json = jsonEncode(pauseMessage);
+
+    _socketChannel!.sink.add(json);
+
+    print("Pause race command sent: $json");
   }
-
-  final pauseMessage = {
-    "type": "pauseRace",
-  };
-
-  final json = jsonEncode(pauseMessage);
-
-  _socketChannel!.sink.add(json);
-
-  print("Pause race command sent: $json");
-}
 
   void _receiveJSONString(String jsonString) {
     try {
@@ -278,9 +276,11 @@ void onReceiveData(Object data) {
           break;
 
         case 'startRace':
-          FlutterForegroundTask.sendDataToMain({
-            'type': 'startRace',
-          });
+          FlutterForegroundTask.sendDataToMain({'type': 'startRace'});
+          break;
+
+        case 'raceTimeStart':
+          _handleStartTime(jsonData);
           break;
 
         default:
@@ -364,6 +364,18 @@ void onReceiveData(Object data) {
       print(stack);
     }
   }
+
+  void _handleStartTime(Map<String, dynamic> jsonData) {
+    try {
+      final raceTime = RaceTime.fromJson(jsonData);
+
+      FlutterForegroundTask.sendDataToMain(raceTime.toJson());
+    } catch (e, stack) {
+      print("Error handling start race:");
+      print(e);
+      print(stack);
+    }
+  }
 }
 
 class BackgroundRaceService {
@@ -393,10 +405,8 @@ class BackgroundRaceService {
   }
 
   static void pauseRace() {
-  FlutterForegroundTask.sendDataToTask({
-    'type': 'pauseRace',
-  });
-}
+    FlutterForegroundTask.sendDataToTask({'type': 'pauseRace'});
+  }
 
   static void setTTSSettings({
     required bool lastLap,

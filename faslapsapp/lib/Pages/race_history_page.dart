@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../saved_race.dart';
+import '../Models/saved_race.dart';
 import '../services/race_history_service.dart';
 import 'race_details_page.dart';
 
