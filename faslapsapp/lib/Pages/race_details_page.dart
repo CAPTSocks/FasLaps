@@ -5,17 +5,12 @@ import '../Models/saved_race.dart';
 class RaceDetailsPage extends StatelessWidget {
   final SavedRace race;
 
-  const RaceDetailsPage({
-    super.key,
-    required this.race,
-  });
+  const RaceDetailsPage({super.key, required this.race});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Race Details"),
-      ),
+      appBar: AppBar(title: const Text("Race Details")),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -36,10 +31,7 @@ class RaceDetailsPage extends StatelessWidget {
 
             // Table header
             Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 12,
-                horizontal: 8,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
@@ -51,9 +43,7 @@ class RaceDetailsPage extends StatelessWidget {
                     child: Text(
                       "Lap",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
@@ -61,9 +51,7 @@ class RaceDetailsPage extends StatelessWidget {
                     child: Text(
                       "Time",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
@@ -71,9 +59,7 @@ class RaceDetailsPage extends StatelessWidget {
                     child: Text(
                       "Best",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   Expanded(
@@ -81,9 +67,16 @@ class RaceDetailsPage extends StatelessWidget {
                     child: Text(
                       "Position",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      "Behind Leader",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -95,9 +88,7 @@ class RaceDetailsPage extends StatelessWidget {
             // Lap data
             Expanded(
               child: race.laps.isEmpty
-                  ? const Center(
-                      child: Text("No lap data available."),
-                    )
+                  ? const Center(child: Text("No lap data available."))
                   : ListView.builder(
                       itemCount: race.laps.length,
                       itemBuilder: (context, index) {
@@ -111,8 +102,7 @@ class RaceDetailsPage extends StatelessWidget {
                           decoration: BoxDecoration(
                             border: Border(
                               bottom: BorderSide(
-                                color: Theme.of(context)
-                                    .dividerColor,
+                                color: Theme.of(context).dividerColor,
                               ),
                             ),
                           ),
@@ -143,6 +133,15 @@ class RaceDetailsPage extends StatelessWidget {
                                 flex: 2,
                                 child: Text(
                                   "${lap.racePosition}",
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  lap.behindLeaderSeconds != null
+                                      ? "${lap.behindLeaderSeconds!.toStringAsFixed(2)}s"
+                                      : "-",
                                   textAlign: TextAlign.center,
                                 ),
                               ),

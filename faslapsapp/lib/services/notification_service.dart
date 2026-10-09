@@ -85,6 +85,28 @@ class NotificationService {
     );
   }
 
+  Future<void> showServerNotification(Map<String, dynamic> jsonData) async {
+  final title = jsonData['title'];
+  final message = jsonData['message'];
+  final notificationId = jsonData['notificationId'];
+
+  if (title is! String ||
+      message is! String ||
+      title.isEmpty ||
+      message.isEmpty) {
+    print('Invalid server notification received.');
+    return;
+  }
+
+  await showNotification(
+    title: title,
+    message: message,
+    notificationId: notificationId is int
+        ? notificationId
+        : 0,
+  );
+}
+
   Future<void> showTestNotification() async {
     await showNotification(
       title: 'FasLaps Test',

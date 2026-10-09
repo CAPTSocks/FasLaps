@@ -263,6 +263,14 @@ class RaceTaskHandler extends TaskHandler {
       }
 
       switch (messageType) {
+
+        case 'notification':
+          FlutterForegroundTask.sendDataToMain({
+            'type': 'serverNotification',
+            'notification': jsonData,
+          });
+          break;
+
         case 'lapData':
           _handleLapData(jsonData);
           break;
@@ -275,11 +283,11 @@ class RaceTaskHandler extends TaskHandler {
           _handleFuelData(jsonData);
           break;
 
-        case 'startRace':
-          FlutterForegroundTask.sendDataToMain({'type': 'startRace'});
+        case 'unpauseRace':
+          FlutterForegroundTask.sendDataToMain({'type': 'unpauseRace'});
           break;
 
-        case 'raceTimeStart':
+        case 'startRaceTimer':
           _handleStartTime(jsonData);
           break;
 
@@ -371,7 +379,7 @@ class RaceTaskHandler extends TaskHandler {
 
       FlutterForegroundTask.sendDataToMain(raceTime.toJson());
     } catch (e, stack) {
-      print("Error handling start race:");
+      print("Error handling start race time:");
       print(e);
       print(stack);
     }

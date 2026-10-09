@@ -4,6 +4,8 @@ import 'settings_page.dart';
 import 'package:faslapsapp/pages/race_history_page.dart';
 import 'package:faslapsapp/Pages/practice_race_history_page.dart';
 import '../services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'my_cars_page.dart';
 
 class MainMenuPage extends StatelessWidget {
   final String firstName;
@@ -80,7 +82,7 @@ class MainMenuPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const PracticeRaceHistoryPage(),
+                    builder: (context) => const SavedSlotCarsPage(),
                   ),
                 );
               },
@@ -103,6 +105,28 @@ class MainMenuPage extends StatelessWidget {
                 await NotificationService.instance.showTestNotification();
               },
               child: const Text('Test Notification'),
+            ),
+
+            ElevatedButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+
+                // Remove all saved race history.
+                final removed = await prefs.remove('savedRaces');
+
+                // Verify the result.
+                final remaining = prefs.getString('savedRaces');
+
+                debugPrint('Key removed: $removed');
+                debugPrint('Remaining race data: $remaining');
+
+                if (remaining == null) {
+                  debugPrint('Saved race history successfully cleared.');
+                } else {
+                  debugPrint('Race history still exists!');
+                }
+              },
+              child: const Text('Delete All Saved Races (Debug)'),
             ),
           ],
         ),

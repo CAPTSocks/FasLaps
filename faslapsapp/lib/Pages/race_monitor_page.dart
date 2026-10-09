@@ -11,6 +11,7 @@ import 'package:faslapsapp/Models/fuel_data.dart';
 import 'package:faslapsapp/Widgets/race_header.dart';
 import 'package:faslapsapp/Widgets/race_stats_row.dart';
 import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
+import 'package:faslapsapp/services/notification_service.dart';
 import 'dart:async';
 
 class RaceMonitorPage extends StatefulWidget {
@@ -97,6 +98,11 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     final type = data['type'];
 
     switch (type) {
+
+      case 'serverNotification':
+      await _handleServerNotification(data);
+      break;
+
       case 'connectionStatus':
         _handleConnectionStatus(data);
         break;
@@ -113,15 +119,15 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         await _handleRaceInfo(data);
         break;
 
-      case 'startRace':
-        _handleStartRace();
+      case 'unpauseRace':
+        _handleUnpauseRace();
         break;
 
       case 'fuelData':
         _handleFuelData(data);
         break;
 
-      case 'raceTimeStart':
+      case 'startRaceTimer':
         _handleStartTime(data);
         break;
 
@@ -129,6 +135,24 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         print("Unknown message type received: $type");
     }
   }
+
+  Future<void> _handleServerNotification(Map data) async {
+  final notification = data['notification'];
+
+  if (notification is! Map) {
+    print("Invalid server notification data.");
+    return;
+  }
+
+  try {
+    await NotificationService.instance.showServerNotification(
+      Map<String, dynamic>.from(notification),
+    );
+  } catch (e, stackTrace) {
+    print("Error displaying server notification: $e");
+    print(stackTrace);
+  }
+}
 
   void _handleConnectionStatus(Map data) {
     final connectionStatus = data['status'];
@@ -152,7 +176,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     });
   }
 
-  void _handleStartRace() {
+  void _handleUnpauseRace() {
     if (!mounted) return;
 
     setState(() {

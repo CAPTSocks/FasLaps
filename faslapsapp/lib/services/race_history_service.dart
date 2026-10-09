@@ -28,7 +28,9 @@ class RaceHistoryService {
       return races;
     }
 
-    return races.where((race) => race.raceType.toLowerCase() == raceType).toList();
+    return races
+        .where((race) => race.raceType.toLowerCase() == raceType)
+        .toList();
   }
 
   static Future<SavedRace?> findRace(String raceId) async {
@@ -85,28 +87,22 @@ class RaceHistoryService {
     );
   }
 
- static Future<void> clearRaces({
-  String? raceType,
-}) async {
-  final races = await loadRaces();
+  static Future<void> clearRaces({String? raceType}) async {
+    final races = await loadRaces();
 
-  if (raceType == null) {
+    if (raceType == null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_storageKey);
+      return;
+    }
+
+    races.removeWhere((race) => race.raceType.toLowerCase() == raceType);
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
-    return;
+
+    await prefs.setString(
+      _storageKey,
+      jsonEncode(races.map((race) => race.toJson()).toList()),
+    );
   }
-
-  races.removeWhere(
-    (race) => race.raceType.toLowerCase() == raceType,
-  );
-
-  final prefs = await SharedPreferences.getInstance();
-
-  await prefs.setString(
-    _storageKey,
-    jsonEncode(
-      races.map((race) => race.toJson()).toList(),
-    ),
-  );
-}
 }
