@@ -5,6 +5,8 @@ class RaceInfo {
   final DateTime raceDate;
   final String raceHeat;
   final String raceType;
+  final bool showFuelBar;
+  final bool canPauseRace;
 
   RaceInfo({
     required this.type,
@@ -13,6 +15,8 @@ class RaceInfo {
     required this.raceDate,
     required this.raceHeat,
     required this.raceType,
+    required this.showFuelBar,
+    required this.canPauseRace,
   });
 
   factory RaceInfo.fromJson(Map<String, dynamic> json) {
@@ -23,6 +27,8 @@ class RaceInfo {
       raceDate: DateTime.parse(json['raceDate'] as String),
       raceHeat: json['raceHeat'] as String,
       raceType: json['raceType'] as String,
+      showFuelBar: json['showFuelBar'] as bool,
+      canPauseRace: json['canPauseRace'] as bool,
     );
   }
   Map<String, dynamic> toJson() {
@@ -32,7 +38,9 @@ class RaceInfo {
       'raceName': raceName,
       'raceDate': raceDate.toIso8601String(),
       'raceHeat': raceHeat,
-      'raceType' : raceType
+      'raceType' : raceType,
+      'showFuelBar' : showFuelBar,
+      'canPauseRace' : canPauseRace,
     };
   }
 }

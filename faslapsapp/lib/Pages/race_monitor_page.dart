@@ -41,6 +41,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   bool readAverageLap = true;
   bool readFuel = true;
   bool isRacePaused = false;
+  bool showFuelBar = true;
+  bool canPauseRace = true;
 
   void _updateTTSSettings() {
     BackgroundRaceService.setTTSSettings(
@@ -98,10 +100,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     final type = data['type'];
 
     switch (type) {
-
       case 'serverNotification':
-      await _handleServerNotification(data);
-      break;
+        await _handleServerNotification(data);
+        break;
 
       case 'connectionStatus':
         _handleConnectionStatus(data);
@@ -137,22 +138,22 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   }
 
   Future<void> _handleServerNotification(Map data) async {
-  final notification = data['notification'];
+    final notification = data['notification'];
 
-  if (notification is! Map) {
-    print("Invalid server notification data.");
-    return;
-  }
+    if (notification is! Map) {
+      print("Invalid server notification data.");
+      return;
+    }
 
-  try {
-    await NotificationService.instance.showServerNotification(
-      Map<String, dynamic>.from(notification),
-    );
-  } catch (e, stackTrace) {
-    print("Error displaying server notification: $e");
-    print(stackTrace);
+    try {
+      await NotificationService.instance.showServerNotification(
+        Map<String, dynamic>.from(notification),
+      );
+    } catch (e, stackTrace) {
+      print("Error displaying server notification: $e");
+      print(stackTrace);
+    }
   }
-}
 
   void _handleConnectionStatus(Map data) {
     final connectionStatus = data['status'];
@@ -257,6 +258,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       currentRaceInfo = raceInfo;
 
+      final showFuelBarValue = raceInfoJson['showFuelBar'];
+      final canPauseRaceValue = raceInfoJson['canPauseRace'];
+
       print(
         "CURRENT RACE INFO: "
         "${currentRaceInfo?.raceName} - "
@@ -271,6 +275,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         raceName = raceInfo.raceName;
         raceHeat = raceInfo.raceHeat;
         raceInfoReceived = true;
+
+        showFuelBar = showFuelBarValue is bool ? showFuelBarValue : true;
+
+        canPauseRace = canPauseRaceValue is bool ? canPauseRaceValue : true;
 
         raceHistory
           ..clear()
@@ -317,42 +325,34 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
- 
-void _handleStartTime(Map data) {
-  try {
-    final raceTime = RaceTime.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+  void _handleStartTime(Map data) {
+    try {
+      final raceTime = RaceTime.fromJson(Map<String, dynamic>.from(data));
 
-    _displayTimer?.cancel();
+      _displayTimer?.cancel();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      raceStartTime = raceTime.startTime;
+      setState(() {
+        raceStartTime = raceTime.startTime;
 
-      final elapsed = DateTime.now().difference(raceStartTime!);
-      raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
-    });
+        final elapsed = DateTime.now().difference(raceStartTime!);
+        raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+      });
 
-    _displayTimer = Timer.periodic(
-      const Duration(milliseconds: 100),
-      (_) {
+      _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (!mounted || raceStartTime == null) return;
 
         final elapsed = DateTime.now().difference(raceStartTime!);
 
         setState(() {
-          raceElapsed =
-              elapsed.isNegative ? Duration.zero : elapsed;
+          raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
         });
-      },
-    );
-  } catch (e) {
-    print("Error processing race start time: $e");
+      });
+    } catch (e) {
+      print("Error processing race start time: $e");
+    }
   }
-}
-
 
   String _formatElapsedTime(Duration duration) {
     final minutes = duration.inMinutes;
@@ -527,19 +527,22 @@ void _handleStartTime(Map data) {
 
                   const SizedBox(height: 10),
 
-                  FuelBar(
-                    fuelAmount: fuelAmount,
-                    isTtsEnabled: readFuel,
-                    onTtsToggle: () {
-                      setState(() {
-                        readFuel = !readFuel;
-                      });
+                  if (showFuelBar) ...[
+                    FuelBar(
+                      fuelAmount: fuelAmount,
+                      isTtsEnabled: readFuel,
+                      onTtsToggle: () {
+                        setState(() {
+                          readFuel = !readFuel;
+                        });
 
-                      _updateTTSSettings();
-                    },
-                  ),
+                        _updateTTSSettings();
+                      },
+                    ),
 
-                  const SizedBox(height: 36),
+                    const SizedBox(height: 36),
+                  ] else
+                    const SizedBox(height: 10),
 
                   LapTimeTtsRow(
                     title: "Last Lap",
@@ -599,7 +602,7 @@ void _handleStartTime(Map data) {
               width: double.infinity,
               height: 125,
               child: ElevatedButton.icon(
-                onPressed: isRacePaused
+                onPressed: (isRacePaused || !canPauseRace)
                     ? null
                     : () {
                         BackgroundRaceService.pauseRace();
