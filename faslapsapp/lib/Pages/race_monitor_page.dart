@@ -30,6 +30,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   DateTime? raceStartTime;
   Timer? _displayTimer;
   Duration raceElapsed = Duration.zero;
+  Duration _elapsedBeforeResume = Duration.zero;
 
   String status = "Connecting...";
   String raceName = "Waiting for Race Info";
@@ -95,6 +96,15 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   void _onReceiveTaskData(Object data) async {
     print("UI received from background: $data");
 
+    if (data is Map && data['type'] == 'startRaceTimer') {
+      print(
+        '[TIMER DEBUG] UI received start command at '
+        '${DateTime.now().toIso8601String()}',
+      );
+    }
+
+    print("UI received from background: $data");
+
     if (data is! Map) return;
 
     final type = data['type'];
@@ -118,6 +128,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       case 'raceInfo':
         await _handleRaceInfo(data);
+        break;
+        
+      case 'pauseRace':
+        _handlePauseRace();
         break;
 
       case 'unpauseRace':
@@ -177,12 +191,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     });
   }
 
-  void _handleUnpauseRace() {
-    if (!mounted) return;
+  void _handlePauseRace() {
+    _pauseTimer();
+  }
 
-    setState(() {
-      isRacePaused = false;
-    });
+  void _handleUnpauseRace() {
+    _resumeTimer();
   }
 
   void _handleLapData(Map data) {
@@ -327,17 +341,32 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
   void _handleStartTime(Map data) {
     try {
+      print(
+        '[TIMER DEBUG] UI handling start command at '
+        '${DateTime.now().toIso8601String()}',
+      );
+
       final raceTime = RaceTime.fromJson(Map<String, dynamic>.from(data));
 
       _displayTimer?.cancel();
+      _displayTimer = null;
 
       if (!mounted) return;
 
       setState(() {
         raceStartTime = raceTime.startTime;
+        raceElapsed = Duration.zero;
+        isRacePaused = false;
+      });
+
+      _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (!mounted || raceStartTime == null || isRacePaused) return;
 
         final elapsed = DateTime.now().difference(raceStartTime!);
-        raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+
+        setState(() {
+          raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+        });
       });
 
       _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
@@ -362,6 +391,43 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     return '${minutes.toString().padLeft(2, '0')}:'
         '${seconds.toString().padLeft(2, '0')}.'
         '${centiseconds.toString().padLeft(2, '0')}';
+  }
+
+  void _pauseTimer() {
+    if (isRacePaused) return;
+
+    _displayTimer?.cancel();
+    _displayTimer = null;
+
+    if (!mounted) return;
+
+    setState(() {
+      isRacePaused = true;
+    });
+  }
+
+  void _resumeTimer() {
+    if (!isRacePaused || raceStartTime == null) return;
+
+    // Adjust the start time so the timer continues
+    // from where it was paused.
+    raceStartTime = DateTime.now().subtract(raceElapsed);
+
+    if (!mounted) return;
+
+    setState(() {
+      isRacePaused = false;
+    });
+
+    _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted || raceStartTime == null || isRacePaused) return;
+
+      final elapsed = DateTime.now().difference(raceStartTime!);
+
+      setState(() {
+        raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+      });
+    });
   }
 
   double get lastLap {
@@ -606,6 +672,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                     ? null
                     : () {
                         BackgroundRaceService.pauseRace();
+                        _pauseTimer();
 
                         setState(() {
                           isRacePaused = true;

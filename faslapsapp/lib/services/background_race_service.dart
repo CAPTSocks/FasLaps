@@ -263,7 +263,6 @@ class RaceTaskHandler extends TaskHandler {
       }
 
       switch (messageType) {
-
         case 'notification':
           FlutterForegroundTask.sendDataToMain({
             'type': 'serverNotification',
@@ -281,6 +280,10 @@ class RaceTaskHandler extends TaskHandler {
 
         case 'fuelData':
           _handleFuelData(jsonData);
+          break;
+
+        case 'pauseRace':
+          FlutterForegroundTask.sendDataToMain({'type': 'pauseRace'});
           break;
 
         case 'unpauseRace':
@@ -375,12 +378,30 @@ class RaceTaskHandler extends TaskHandler {
 
   void _handleStartTime(Map<String, dynamic> jsonData) {
     try {
+      final receivedAt = DateTime.now();
+
+      print(
+        '[TIMER DEBUG] Background received start command at '
+        '${receivedAt.toIso8601String()}',
+      );
+
       final raceTime = RaceTime.fromJson(jsonData);
 
-      FlutterForegroundTask.sendDataToMain(raceTime.toJson());
+      print(
+        '[TIMER DEBUG] Parsed start time: '
+        '${raceTime.startTime.toIso8601String()}',
+      );
+
+      final message = {...raceTime.toJson(), 'type': 'startRaceTimer'};
+
+      print(
+        '[TIMER DEBUG] Sending start command to UI at '
+        '${DateTime.now().toIso8601String()}',
+      );
+
+      FlutterForegroundTask.sendDataToMain(message);
     } catch (e, stack) {
-      print("Error handling start race time:");
-      print(e);
+      print("Error handling start race time: $e");
       print(stack);
     }
   }
