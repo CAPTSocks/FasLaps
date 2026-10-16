@@ -1,3 +1,4 @@
+import 'package:faslapsapp/Models/race_finished.dart';
 import 'package:faslapsapp/Widgets/fuel_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:faslapsapp/Models/lap_data.dart';
@@ -12,6 +13,7 @@ import 'package:faslapsapp/Widgets/race_header.dart';
 import 'package:faslapsapp/Widgets/race_stats_row.dart';
 import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
 import 'package:faslapsapp/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 class RaceMonitorPage extends StatefulWidget {
@@ -28,9 +30,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
   RaceInfo? currentRaceInfo;
   DateTime? raceStartTime;
+  DateTime? raceEndTime;
   Timer? _displayTimer;
   Duration raceElapsed = Duration.zero;
   Duration _elapsedBeforeResume = Duration.zero;
+  Duration _totalPausedDuration = Duration.zero;
+  DateTime? _pauseStartedAt;
 
   String status = "Connecting...";
   String raceName = "Waiting for Race Info";
@@ -54,21 +59,54 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     );
   }
 
+  Future<void> _loadTTSSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      readFuel = prefs.getBool('readFuel') ?? true;
+      readLastLap = prefs.getBool('readLastLap') ?? true;
+      readBestLap = prefs.getBool('readBestLap') ?? true;
+      readAverageLap = prefs.getBool('readAverageLap') ?? true;
+    });
+  }
+
+  Future<void> _saveTTSSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setBool('readFuel', readFuel);
+    await prefs.setBool('readLastLap', readLastLap);
+    await prefs.setBool('readBestLap', readBestLap);
+    await prefs.setBool('readAverageLap', readAverageLap);
+
+    _updateTTSSettings();
+  }
+
   @override
   void initState() {
     super.initState();
     _initForegroundTaskListener();
 
     BackgroundRaceService.requestRaceHistory();
-    //RaceHistoryService.clearRaces();
 
-    _startRace();
+    _initializeTTSSettings();
+  }
+
+  Future<void> _initializeTTSSettings() async {
+    await _loadTTSSettings();
+
+    if (!mounted) return;
+
+    await _startRace();
   }
 
   Future<void> _startRace() async {
     await BackgroundRaceService.requestPermissions();
 
     await BackgroundRaceService.start();
+
+    _updateTTSSettings();
 
     BackgroundRaceService.sendServerAddress(widget.serverAddress);
   }
@@ -129,7 +167,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       case 'raceInfo':
         await _handleRaceInfo(data);
         break;
-        
+
       case 'pauseRace':
         _handlePauseRace();
         break;
@@ -144,6 +182,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       case 'startRaceTimer':
         _handleStartTime(data);
+        break;
+
+      case 'raceFinished':
+        _handleRaceFinished(data);
         break;
 
       default:
@@ -355,24 +397,20 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       setState(() {
         raceStartTime = raceTime.startTime;
+        raceEndTime = null;
         raceElapsed = Duration.zero;
+        _totalPausedDuration = Duration.zero;
+        _pauseStartedAt = null;
         isRacePaused = false;
       });
 
       _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!mounted || raceStartTime == null || isRacePaused) return;
+        if (!mounted || raceStartTime == null || isRacePaused) {
+          return;
+        }
 
-        final elapsed = DateTime.now().difference(raceStartTime!);
-
-        setState(() {
-          raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
-        });
-      });
-
-      _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!mounted || raceStartTime == null) return;
-
-        final elapsed = DateTime.now().difference(raceStartTime!);
+        final elapsed =
+            DateTime.now().difference(raceStartTime!) - _totalPausedDuration;
 
         setState(() {
           raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
@@ -382,6 +420,56 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       print("Error processing race start time: $e");
     }
   }
+
+ void _handleRaceFinished(Map data) {
+  try {
+    final raceFinished = RaceFinished.fromJson(
+      Map<String, dynamic>.from(data),
+    );
+
+    final endTime = raceFinished.endTime;
+    final startTime = raceStartTime;
+
+    if (startTime == null) {
+      debugPrint('Cannot calculate final time: start time is missing.');
+      return;
+    }
+
+    var totalPaused = _totalPausedDuration;
+
+    // Include an ongoing pause, if there is one.
+    if (_pauseStartedAt != null) {
+      totalPaused += endTime.difference(_pauseStartedAt!);
+    }
+
+    var finalElapsed =
+        endTime.difference(startTime) - totalPaused;
+
+    if (finalElapsed.isNegative) {
+      finalElapsed = Duration.zero;
+    }
+
+    _displayTimer?.cancel();
+    _displayTimer = null;
+
+    if (!mounted) return;
+
+    setState(() {
+      raceEndTime = endTime;
+      raceElapsed = finalElapsed;
+      _totalPausedDuration = totalPaused;
+      _pauseStartedAt = null;
+      isRacePaused = true;
+    });
+
+    debugPrint(
+      'Final race time: ${_formatElapsedTime(finalElapsed)}',
+    );
+  } catch (e, stackTrace) {
+    debugPrint('Error processing race-finished message: $e');
+    debugPrint('$stackTrace');
+  }
+}
 
   String _formatElapsedTime(Duration duration) {
     final minutes = duration.inMinutes;
@@ -403,15 +491,20 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
     setState(() {
       isRacePaused = true;
+      _pauseStartedAt = DateTime.now();
     });
   }
 
   void _resumeTimer() {
     if (!isRacePaused || raceStartTime == null) return;
 
-    // Adjust the start time so the timer continues
-    // from where it was paused.
-    raceStartTime = DateTime.now().subtract(raceElapsed);
+    final now = DateTime.now();
+
+    // Add this pause's duration to the accumulated paused time.
+    if (_pauseStartedAt != null) {
+      _totalPausedDuration += now.difference(_pauseStartedAt!);
+      _pauseStartedAt = null;
+    }
 
     if (!mounted) return;
 
@@ -420,9 +513,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     });
 
     _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted || raceStartTime == null || isRacePaused) return;
+      if (!mounted || raceStartTime == null || isRacePaused) {
+        return;
+      }
 
-      final elapsed = DateTime.now().difference(raceStartTime!);
+      final elapsed =
+          DateTime.now().difference(raceStartTime!) - _totalPausedDuration;
 
       setState(() {
         raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
@@ -602,7 +698,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                           readFuel = !readFuel;
                         });
 
-                        _updateTTSSettings();
+                        _saveTTSSettings();
                       },
                     ),
 
@@ -620,7 +716,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       setState(() {
                         readLastLap = !readLastLap;
                       });
-                      _updateTTSSettings();
+                      _saveTTSSettings();
+                      ();
                     },
                   ),
 
@@ -634,7 +731,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       setState(() {
                         readBestLap = !readBestLap;
                       });
-                      _updateTTSSettings();
+                      _saveTTSSettings();
+                      ();
                     },
                   ),
 
@@ -648,7 +746,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       setState(() {
                         readAverageLap = !readAverageLap;
                       });
-                      _updateTTSSettings();
+                      _saveTTSSettings();
                     },
                   ),
 

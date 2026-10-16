@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:faslapsapp/Models/race_finished.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -11,6 +12,7 @@ import 'package:faslapsapp/Models/race_info.dart';
 import 'package:faslapsapp/services/tts_service.dart';
 import 'package:faslapsapp/Models/fuel_data.dart';
 import 'package:faslapsapp/Models/race_time.dart';
+import 'package:faslapsapp/Models/race_finished.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -294,6 +296,10 @@ class RaceTaskHandler extends TaskHandler {
           _handleStartTime(jsonData);
           break;
 
+        case 'raceFinished':
+        _handleFinishRace(jsonData);
+        break; 
+
         default:
           print("Unknown message type received: $messageType");
           break;
@@ -404,6 +410,25 @@ class RaceTaskHandler extends TaskHandler {
       print("Error handling start race time: $e");
       print(stack);
     }
+  }
+}
+
+void _handleFinishRace(Map<String, dynamic> jsonData) {
+  try {
+    final raceFinished = RaceFinished.fromJson(jsonData);
+
+    final message = {
+      ...raceFinished.toJson(),
+      'type': 'raceFinished',
+    };
+
+    FlutterForegroundTask.sendDataToMain(message);
+
+    print('Race finished message forwarded to UI: $message');
+  } catch (e, stack) {
+    print('Error handling race finished info:');
+    print(e);
+    print(stack);
   }
 }
 
