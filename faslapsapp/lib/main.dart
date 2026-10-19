@@ -63,12 +63,14 @@ class FasLapsQRApp extends StatelessWidget {
 
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: const Color.fromRGBO(23, 43, 61, 1),
+            backgroundColor: const Color.fromARGB(255, 47, 50, 53),
             foregroundColor: Colors.white,
-
+            
             elevation: 3,
 
             shadowColor: const Color.fromARGB(255, 225, 115, 6),
+
+            minimumSize: const Size(0, 80),
 
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 15),
 
@@ -78,7 +80,7 @@ class FasLapsQRApp extends StatelessWidget {
             ),
 
             textStyle: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.8,
             ),

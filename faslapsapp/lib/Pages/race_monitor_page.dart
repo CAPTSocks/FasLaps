@@ -33,9 +33,6 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   DateTime? raceEndTime;
   Timer? _displayTimer;
   Duration raceElapsed = Duration.zero;
-  Duration _elapsedBeforeResume = Duration.zero;
-  Duration _totalPausedDuration = Duration.zero;
-  DateTime? _pauseStartedAt;
 
   String status = "Connecting...";
   String raceName = "Waiting for Race Info";
@@ -399,8 +396,6 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         raceStartTime = raceTime.startTime;
         raceEndTime = null;
         raceElapsed = Duration.zero;
-        _totalPausedDuration = Duration.zero;
-        _pauseStartedAt = null;
         isRacePaused = false;
       });
 
@@ -409,67 +404,44 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
           return;
         }
 
-        final elapsed =
-            DateTime.now().difference(raceStartTime!) - _totalPausedDuration;
+        final elapsed = DateTime.now().difference(raceStartTime!);
 
         setState(() {
           raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;
         });
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       print("Error processing race start time: $e");
+      print(stackTrace);
     }
   }
 
- void _handleRaceFinished(Map data) {
-  try {
-    final raceFinished = RaceFinished.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+  void _handleRaceFinished(Map data) {
+    try {
+      final raceFinished = RaceFinished.fromJson(
+        Map<String, dynamic>.from(data),
+      );
 
-    final endTime = raceFinished.endTime;
-    final startTime = raceStartTime;
+      _displayTimer?.cancel();
+      _displayTimer = null;
 
-    if (startTime == null) {
-      debugPrint('Cannot calculate final time: start time is missing.');
-      return;
+      if (!mounted) return;
+
+      setState(() {
+        raceEndTime = raceFinished.endTime;
+
+        // Use the authoritative duration calculated by the server.
+        raceElapsed = Duration(milliseconds: raceFinished.elapsedRaceTIme);
+
+        isRacePaused = true;
+      });
+
+      debugPrint('Final race time: ${_formatElapsedTime(raceElapsed)}');
+    } catch (e, stackTrace) {
+      debugPrint('Error processing race-finished message: $e');
+      debugPrint('$stackTrace');
     }
-
-    var totalPaused = _totalPausedDuration;
-
-    // Include an ongoing pause, if there is one.
-    if (_pauseStartedAt != null) {
-      totalPaused += endTime.difference(_pauseStartedAt!);
-    }
-
-    var finalElapsed =
-        endTime.difference(startTime) - totalPaused;
-
-    if (finalElapsed.isNegative) {
-      finalElapsed = Duration.zero;
-    }
-
-    _displayTimer?.cancel();
-    _displayTimer = null;
-
-    if (!mounted) return;
-
-    setState(() {
-      raceEndTime = endTime;
-      raceElapsed = finalElapsed;
-      _totalPausedDuration = totalPaused;
-      _pauseStartedAt = null;
-      isRacePaused = true;
-    });
-
-    debugPrint(
-      'Final race time: ${_formatElapsedTime(finalElapsed)}',
-    );
-  } catch (e, stackTrace) {
-    debugPrint('Error processing race-finished message: $e');
-    debugPrint('$stackTrace');
   }
-}
 
   String _formatElapsedTime(Duration duration) {
     final minutes = duration.inMinutes;
@@ -491,20 +463,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
     setState(() {
       isRacePaused = true;
-      _pauseStartedAt = DateTime.now();
     });
   }
 
   void _resumeTimer() {
     if (!isRacePaused || raceStartTime == null) return;
 
-    final now = DateTime.now();
-
-    // Add this pause's duration to the accumulated paused time.
-    if (_pauseStartedAt != null) {
-      _totalPausedDuration += now.difference(_pauseStartedAt!);
-      _pauseStartedAt = null;
-    }
+    // Continue the local display from its frozen elapsed time.
+    raceStartTime = DateTime.now().subtract(raceElapsed);
 
     if (!mounted) return;
 
@@ -517,8 +483,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         return;
       }
 
-      final elapsed =
-          DateTime.now().difference(raceStartTime!) - _totalPausedDuration;
+      final elapsed = DateTime.now().difference(raceStartTime!);
 
       setState(() {
         raceElapsed = elapsed.isNegative ? Duration.zero : elapsed;

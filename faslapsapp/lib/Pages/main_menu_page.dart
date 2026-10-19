@@ -19,114 +19,298 @@ class MainMenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String newfirstName = firstName[0].toUpperCase() + firstName.substring(1);
-    String newLastName = lastName[0].toUpperCase() + lastName.substring(1);
-    double buttonSpace = 8.0;
+    final newFirstName = firstName.isNotEmpty
+        ? firstName[0].toUpperCase() + firstName.substring(1)
+        : '';
+    final newLastName = lastName.isNotEmpty
+        ? lastName[0].toUpperCase() + lastName.substring(1)
+        : '';
+
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Main Menu")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      appBar: AppBar(
+        title: const Text('FasLaps'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'My Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SettingsPage()),
+              );
+            },
+          ),
+        ],
+      ),
+
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Welcome header
+              Text(
+                'Welcome back!',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$newFirstName $newLastName'.trim(),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // Main action: Connect to Race
+              SizedBox(
+                height: 82,
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(
+                      color: Color(0xFFEA661E),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const QRScannerPage(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.qr_code_scanner,
+                            size: 34,
+                            color: Color(0xFFEA661E),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Connect to Race',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Scan a QR code to connect',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFFEA661E),
+                            size: 28,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Compact history buttons side by side
+              Row(
+                children: [
+                  Expanded(
+                    child: _MenuButton(
+                      icon: Icons.emoji_events_outlined,
+                      label: 'My Races',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RaceHistoryPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MenuButton(
+                      icon: Icons.timer_outlined,
+                      label: 'My Practices',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PracticeRaceHistoryPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // My Cars
+              // My Cars
+              Center(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.5 - 20,
+                  height: 52,
+                  child: _MenuButton(
+                    icon: Icons.directions_car,
+                    label: "My Cars",
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SavedSlotCarsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const Spacer(),
+
+              // Development tools: remove before release if desired
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Developer Tools'),
+                leading: const Icon(Icons.build_outlined),
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        await NotificationService.instance
+                            .showTestNotification();
+                      },
+                      child: const Text('Test Notification'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                            title: const Text('Delete All Saved Races?'),
+                            content: const Text(
+                              'This will permanently clear the saved '
+                              'race history on this device.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.pop(dialogContext, false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(dialogContext, true),
+                                child: const Text('Delete All'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm != true) return;
+
+                        final prefs = await SharedPreferences.getInstance();
+                        final removed = await prefs.remove('savedRaces');
+                        final remaining = prefs.getString('savedRaces');
+
+                        debugPrint('Key removed: $removed');
+                        debugPrint('Remaining race data: $remaining');
+
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              remaining == null
+                                  ? 'Saved race history cleared.'
+                                  : 'Could not clear all race history.',
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Delete All Saved Races'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Reusable compact button for the two history features.
+class _MenuButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _MenuButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: const Color.fromARGB(255, 18, 29, 31),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              "Welcome $newfirstName $newLastName",
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-
-            const SizedBox(height: 30),
-
-            FilledButton.icon(
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text("Connect To Race"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const QRScannerPage()),
-                );
-              },
-            ),
-            SizedBox(height: buttonSpace),
-            FilledButton.icon(
-              icon: const Icon(Icons.sports_score),
-              label: const Text("My Races"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RaceHistoryPage(),
-                  ),
-                );
-              },
-            ),
-            SizedBox(height: buttonSpace),
-
-            FilledButton.icon(
-              icon: const Icon(Icons.timer),
-              label: const Text("My Practices"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PracticeRaceHistoryPage(),
-                  ),
-                );
-              },
-            ),
-
-            SizedBox(height: buttonSpace),
-            FilledButton.icon(
-              icon: const Icon(Icons.car_rental),
-              label: const Text("My Cars"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SavedSlotCarsPage(),
-                  ),
-                );
-              },
-            ),
-
-            SizedBox(height: buttonSpace),
-            FilledButton.icon(
-              icon: const Icon(Icons.settings),
-              label: const Text("My Settings"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => SettingsPage()),
-                );
-              },
-            ),
-
-            ElevatedButton(
-              onPressed: () async {
-                await NotificationService.instance.showTestNotification();
-              },
-              child: const Text('Test Notification'),
-            ),
-
-            ElevatedButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-
-                // Remove all saved race history.
-                final removed = await prefs.remove('savedRaces');
-
-                // Verify the result.
-                final remaining = prefs.getString('savedRaces');
-
-                debugPrint('Key removed: $removed');
-                debugPrint('Remaining race data: $remaining');
-
-                if (remaining == null) {
-                  debugPrint('Saved race history successfully cleared.');
-                } else {
-                  debugPrint('Race history still exists!');
-                }
-              },
-              child: const Text('Delete All Saved Races (Debug)'),
+            Icon(icon, size: 19),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13),
+              ),
             ),
           ],
         ),
