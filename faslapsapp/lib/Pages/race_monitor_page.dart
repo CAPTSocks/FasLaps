@@ -36,8 +36,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   Duration raceElapsed = Duration.zero;
 
   String status = "Connecting...";
-  String raceName = "Waiting for Race Info";
+  String raceName = "";
   String raceHeat = "";
+  String raceStatus = "Waitng for Race to Begin";
   int fuelAmount = 100;
   int lapTotal = 0;
   int currentLap = 0;
@@ -427,6 +428,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
         setState(() {
           raceElapsed = remaining.isNegative ? Duration.zero : remaining;
+          raceStatus = "Race Running";
         });
 
         // Stop updating once the countdown reaches zero.
@@ -457,6 +459,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
         // Use the authoritative duration calculated by the server.
         raceElapsed = Duration.zero;
+        raceStatus = "Race Completed";
 
         isRacePaused = true;
       });
@@ -483,11 +486,13 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
     _displayTimer?.cancel();
     _displayTimer = null;
+    
 
     if (!mounted) return;
 
     setState(() {
       isRacePaused = true;
+      raceStatus = "Race Paused";
     });
   }
 
@@ -514,6 +519,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       setState(() {
         raceElapsed = remaining.isNegative ? Duration.zero : remaining;
+        raceStatus = "Race Running";
       });
 
       if (remaining <= Duration.zero) {
@@ -659,6 +665,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                     raceName: raceName,
                     raceHeat: raceHeat,
                     status: status,
+                    raceStatus: raceStatus,
+
+
                   ),
 
                   const SizedBox(height: 10),
@@ -701,9 +710,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       },
                     ),
 
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 26),
                   ] else
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 5),
 
                   LapTimeTtsRow(
                     title: "Last Lap",

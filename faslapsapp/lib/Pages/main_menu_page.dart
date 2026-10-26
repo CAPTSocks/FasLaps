@@ -52,32 +52,31 @@ class MainMenuPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Welcome header
-              Text(
-                'Welcome back!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$newFirstName $newLastName'.trim(),
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-
-              const SizedBox(height: 25),
+              // Text(
+              //   'Welcome back!',
+              //   style: theme.textTheme.headlineSmall?.copyWith(
+              //     fontWeight: FontWeight.bold,
+              //   ),
+              // ),
+              // const SizedBox(height: 4),
+              // Text(
+              //   '$newFirstName $newLastName'.trim(),
+              //   style: theme.textTheme.bodyLarge?.copyWith(
+              //     color: theme.colorScheme.onSurfaceVariant,
+              //   ),
+              // ),
+              const SizedBox(height: 200),
 
               // Main action: Connect to Race
               SizedBox(
-                height: 82,
+                height: 100,
                 child: Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: const BorderSide(
-                      color: Color(0xFFEA661E),
+                      color: Color.fromARGB(255, 180, 67, 6),
                       width: 1.5,
                     ),
                   ),
@@ -289,12 +288,16 @@ class _MenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 46,
+      height: 60,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 18, 29, 31),
+          backgroundColor: const Color.fromARGB(255, 28, 28, 34),
           padding: const EdgeInsets.symmetric(horizontal: 8),
+          side: BorderSide(
+            color: Color.fromARGB(255, 220, 101, 17),
+            width: 1.5,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -302,14 +305,15 @@ class _MenuButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 19),
+            Icon(icon, size: 19, color: Colors.deepOrange),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
+
+                style: const TextStyle(fontSize: 13, color: Colors.white),
               ),
             ),
           ],
