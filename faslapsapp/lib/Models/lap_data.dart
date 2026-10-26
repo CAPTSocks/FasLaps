@@ -1,3 +1,5 @@
+import 'package:faslapsapp/main.dart';
+
 class LapData {
   String type;
   int lapNumber;
@@ -5,6 +7,7 @@ class LapData {
   double bestLapTimeSeconds;
   double behindLeaderSeconds;
   int racePosition;
+  int lapLeaderCurrentLap;
 
   LapData({
     required this.type,
@@ -13,6 +16,7 @@ class LapData {
     required this.bestLapTimeSeconds,
     required this.behindLeaderSeconds,
     required this.racePosition,
+    required this.lapLeaderCurrentLap,
   });
 
   factory LapData.fromJson(Map<String, dynamic> json) {
@@ -23,6 +27,7 @@ class LapData {
       bestLapTimeSeconds: (json['bestLapTimeSeconds'] as num).toDouble(),
       behindLeaderSeconds: (json['behindLeaderSeconds'] as num).toDouble(),
       racePosition: json['racePosition'] as int,
+      lapLeaderCurrentLap: json['lapLeaderCurrentLap'] as int,
     );
   }
 
@@ -34,6 +39,7 @@ class LapData {
       'bestLapTimeSeconds': bestLapTimeSeconds,
       'behindLeaderSeconds': behindLeaderSeconds,
       'racePosition': racePosition,
+      'lapLeaderCurrentLap' : lapLeaderCurrentLap,
     };
   }
 }

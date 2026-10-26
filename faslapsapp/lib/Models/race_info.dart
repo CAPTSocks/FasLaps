@@ -7,6 +7,8 @@ class RaceInfo {
   final String raceType;
   final bool showFuelBar;
   final bool canPauseRace;
+  final bool isMinuteRace;
+  final int raceLength;
 
   RaceInfo({
     required this.type,
@@ -17,6 +19,8 @@ class RaceInfo {
     required this.raceType,
     required this.showFuelBar,
     required this.canPauseRace,
+    required this.isMinuteRace,
+    required this.raceLength,
   });
 
   factory RaceInfo.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class RaceInfo {
       raceType: json['raceType'] as String,
       showFuelBar: json['showFuelBar'] as bool,
       canPauseRace: json['canPauseRace'] as bool,
+      isMinuteRace: json['isMinuteRace'] as bool,
+      raceLength: json['raceLength'] as int,
     );
   }
   Map<String, dynamic> toJson() {
@@ -41,6 +47,8 @@ class RaceInfo {
       'raceType' : raceType,
       'showFuelBar' : showFuelBar,
       'canPauseRace' : canPauseRace,
+      'isMinuteRace' : isMinuteRace,
+      'raceLength' : raceLength,
     };
   }
 }
