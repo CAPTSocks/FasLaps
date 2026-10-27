@@ -295,7 +295,7 @@ class _MenuButton extends StatelessWidget {
           backgroundColor: const Color.fromARGB(255, 28, 28, 34),
           padding: const EdgeInsets.symmetric(horizontal: 8),
           side: BorderSide(
-            color: Color.fromARGB(255, 220, 101, 17),
+            color: Color.fromARGB(255, 180, 67, 6),
             width: 1.5,
           ),
           shape: RoundedRectangleBorder(
@@ -305,7 +305,7 @@ class _MenuButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 19, color: Colors.deepOrange),
+            Icon(icon, size: 19, color: Color(0xFFEA661E)),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
