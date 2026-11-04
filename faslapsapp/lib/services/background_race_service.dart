@@ -12,7 +12,6 @@ import 'package:faslapsapp/Models/race_info.dart';
 import 'package:faslapsapp/services/tts_service.dart';
 import 'package:faslapsapp/Models/fuel_data.dart';
 import 'package:faslapsapp/Models/race_time.dart';
-import 'package:faslapsapp/Models/race_finished.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -40,9 +39,26 @@ class RaceTaskHandler extends TaskHandler {
 
     WidgetsFlutterBinding.ensureInitialized();
     // Initialize TTS inside the background isolate.
-    //await _ttsService.initializeTTS();
+    // Load saved TTS settings.
+    final prefs = await SharedPreferences.getInstance();
 
-    print("Background TTS initialized");
+    _readLastLap = prefs.getBool('readLastLap') ?? true;
+    _readBestLap = prefs.getBool('readBestLap') ?? true;
+    _readAverageLap = prefs.getBool('readAverageLap') ?? true;
+    _readFuel = prefs.getBool('readFuel') ?? true;
+
+    print(
+      '[TTS DEBUG] Loaded saved settings: '
+      'Last Lap=$_readLastLap, '
+      'Best Lap=$_readBestLap, '
+      'Average Lap=$_readAverageLap, '
+      'Fuel=$_readFuel',
+    );
+
+    // Initialize TTS here too if required by your TtsService.
+    // await _ttsService.initializeTTS();
+
+    print("Background TTS settings loaded");
   }
 
   @override
@@ -60,7 +76,7 @@ class RaceTaskHandler extends TaskHandler {
     await _socketSubscription?.cancel();
     await _socketChannel?.sink.close();
 
-    await _ttsService.stop();
+    //await _ttsService.stop();
   }
 
   @override
@@ -297,8 +313,8 @@ class RaceTaskHandler extends TaskHandler {
           break;
 
         case 'raceFinished':
-        _handleFinishRace(jsonData);
-        break; 
+          _handleFinishRace(jsonData);
+          break;
 
         default:
           print("Unknown message type received: $messageType");
@@ -417,10 +433,7 @@ void _handleFinishRace(Map<String, dynamic> jsonData) {
   try {
     final raceFinished = RaceFinished.fromJson(jsonData);
 
-    final message = {
-      ...raceFinished.toJson(),
-      'type': 'raceFinished',
-    };
+    final message = {...raceFinished.toJson(), 'type': 'raceFinished'};
 
     FlutterForegroundTask.sendDataToMain(message);
 

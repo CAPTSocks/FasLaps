@@ -5,6 +5,7 @@ import 'package:faslapsapp/pages/race_history_page.dart';
 import 'package:faslapsapp/Pages/practice_race_history_page.dart';
 import '../services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'race_monitor_page.dart';
 import 'my_cars_page.dart';
 
 class MainMenuPage extends StatelessWidget {
@@ -19,12 +20,12 @@ class MainMenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final newFirstName = firstName.isNotEmpty
-        ? firstName[0].toUpperCase() + firstName.substring(1)
-        : '';
-    final newLastName = lastName.isNotEmpty
-        ? lastName[0].toUpperCase() + lastName.substring(1)
-        : '';
+    // final newFirstName = firstName.isNotEmpty
+    //     ? firstName[0].toUpperCase() + firstName.substring(1)
+    //     : '';
+    // final newLastName = lastName.isNotEmpty
+    //     ? lastName[0].toUpperCase() + lastName.substring(1)
+    //     : '';
 
     final theme = Theme.of(context);
 
@@ -98,7 +99,7 @@ class MainMenuPage extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.qr_code_scanner,
-                            size: 34,
+                            size: 42,
                             color: Color(0xFFEA661E),
                           ),
                           const SizedBox(width: 16),
@@ -110,6 +111,7 @@ class MainMenuPage extends StatelessWidget {
                                 Text(
                                   'Connect to Race',
                                   style: theme.textTheme.titleMedium?.copyWith(
+                                    fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -117,6 +119,7 @@ class MainMenuPage extends StatelessWidget {
                                 Text(
                                   'Scan a QR code to connect',
                                   style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 16,
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -126,7 +129,7 @@ class MainMenuPage extends StatelessWidget {
                           const Icon(
                             Icons.chevron_right,
                             color: Color(0xFFEA661E),
-                            size: 28,
+                            size: 34,
                           ),
                         ],
                       ),
@@ -176,24 +179,24 @@ class MainMenuPage extends StatelessWidget {
 
               // My Cars
               // My Cars
-              Center(
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.5 - 20,
-                  height: 52,
-                  child: _MenuButton(
-                    icon: Icons.directions_car,
-                    label: "My Cars",
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SavedSlotCarsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
+              // Center(
+              //   child: SizedBox(
+              //     width: MediaQuery.of(context).size.width * 0.5 - 20,
+              //     height: 52,
+              //     child: _MenuButton(
+              //       icon: Icons.directions_car,
+              //       label: "My Cars",
+              //       onPressed: () {
+              //         Navigator.push(
+              //           context,
+              //           MaterialPageRoute(
+              //             builder: (_) => const SavedSlotCarsPage(),
+              //           ),
+              //         );
+              //       },
+              //     ),
+              //   ),
+              // ),
               const Spacer(),
 
               // Development tools: remove before release if desired
@@ -263,6 +266,23 @@ class MainMenuPage extends StatelessWidget {
                       child: const Text('Delete All Saved Races'),
                     ),
                   ),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RaceMonitorPage(
+                              serverAddress: 'http://localhost:8080',
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Go to Race Monitor Page'),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -273,7 +293,7 @@ class MainMenuPage extends StatelessWidget {
   }
 }
 
-// Reusable compact button for the two history features.
+// Reusable button for the two history features.
 class _MenuButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -288,13 +308,13 @@ class _MenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 60,
+      height: 70,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: const Color.fromARGB(255, 28, 28, 34),
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          side: BorderSide(
+          side: const BorderSide(
             color: Color.fromARGB(255, 180, 67, 6),
             width: 1.5,
           ),
@@ -305,15 +325,22 @@ class _MenuButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 19, color: Color(0xFFEA661E)),
-            const SizedBox(width: 6),
+            Icon(
+              icon,
+              size: 26,
+              color: const Color(0xFFEA661E),
+            ),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-
-                style: const TextStyle(fontSize: 13, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 17,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

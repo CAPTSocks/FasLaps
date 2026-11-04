@@ -1,4 +1,6 @@
 import 'package:faslapsapp/Models/race_finished.dart';
+import 'package:faslapsapp/Pages/practice_race_history_page.dart';
+import 'package:faslapsapp/Pages/race_history_page.dart';
 import 'package:faslapsapp/Widgets/fuel_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:faslapsapp/Models/lap_data.dart';
@@ -39,6 +41,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   String raceName = "";
   String raceHeat = "";
   String raceStatus = "Waitng for Race to Begin";
+  String? raceType = "";
   int fuelAmount = 100;
   int lapTotal = 0;
   int currentLap = 0;
@@ -50,8 +53,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   bool readFuel = true;
   bool isRacePaused = false;
   bool showFuelBar = true;
-  bool canPauseRace = true;
+  bool canPauseRace = false;
   bool isMinuteRace = true;
+  bool raceSaved = false;
 
   void _updateTTSSettings() {
     BackgroundRaceService.setTTSSettings(
@@ -73,6 +77,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       readBestLap = prefs.getBool('readBestLap') ?? true;
       readAverageLap = prefs.getBool('readAverageLap') ?? true;
     });
+    
   }
 
   Future<void> _saveTTSSettings() async {
@@ -317,6 +322,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       currentRaceInfo = raceInfo;
 
+      raceType = currentRaceInfo?.raceType;
+
       final showFuelBarValue = raceInfoJson['showFuelBar'];
       final canPauseRaceValue = raceInfoJson['canPauseRace'];
 
@@ -412,6 +419,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       raceStartTime = raceTime.startTime;
       _countdownEndTime = raceTime.startTime.add(raceDuration);
+      _updateTTSSettings();
 
       setState(() {
         raceEndTime = null;
@@ -460,6 +468,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         // Use the authoritative duration calculated by the server.
         raceElapsed = Duration.zero;
         raceStatus = "Race Completed";
+        _finishRacePop();
 
         isRacePaused = true;
       });
@@ -486,7 +495,6 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
     _displayTimer?.cancel();
     _displayTimer = null;
-    
 
     if (!mounted) return;
 
@@ -560,7 +568,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     return total / raceHistory.length;
   }
 
-  Future<void> _stopRace() async {
+  Future<void> _leaveRace() async {
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -639,6 +647,75 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
+  Future<void> _finishRacePop() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("See $raceType results?", textAlign: TextAlign.center),
+
+          content: Row(
+            spacing: 12,
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 80,
+                  width: 200,
+                  child: FilledButton(
+                    onPressed: () async {
+                      // Save the race first
+                      await RaceHistoryService.saveRace(
+                        currentRaceInfo!,
+                        raceHistory.reversed.toList(),
+                      );
+
+                      // Make sure the widget is still mounted
+                      if (!context.mounted) return;
+
+                      // Close the prompt
+                      Navigator.pop(context);
+
+                      // Navigate based on race type
+                      if (raceType == "Race") {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RaceHistoryPage(),
+                          ),
+                        );
+                      } else if (raceType == "Practice") {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PracticeRaceHistoryPage(),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text("Yes"),
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: SizedBox(
+                  height: 80,
+                  width: 200,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: Text("No"),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -648,7 +725,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
           IconButton(
             icon: const Icon(Icons.close),
             tooltip: "Stop Race",
-            onPressed: _stopRace,
+            onPressed: _leaveRace,
           ),
         ],
       ),
@@ -666,8 +743,6 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                     raceHeat: raceHeat,
                     status: status,
                     raceStatus: raceStatus,
-
-
                   ),
 
                   const SizedBox(height: 10),
