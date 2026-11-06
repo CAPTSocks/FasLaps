@@ -12,6 +12,35 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final TtsService ttsService = TtsService.instance;
+  bool keepScreenOn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScreenSettings();
+  }
+
+  Future<void> _loadScreenSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      keepScreenOn = prefs.getBool('keepScreenOn') ?? false;
+    });
+  }
+
+  Future<void> _saveScreenSettings(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setBool('keepScreenOn', value);
+
+    if (!mounted) return;
+
+    setState(() {
+      keepScreenOn = value;
+    });
+  }
 
   Future<void> _changeTtsSettings(BuildContext context) async {
     //final TtsService ttsService = TtsService();
@@ -111,8 +140,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.remove('pin');
   }
 
-
-   Future<void> _changeUserSettings(BuildContext context) async {
+  Future<void> _changeUserSettings(BuildContext context) async {
     bool isNotificationsEnabled = false; // Default value
     await showDialog(
       context: context,
@@ -138,10 +166,10 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                       ),
-                      
+
                       // 2. Add a small horizontal gap between the fields
                       const SizedBox(width: 10),
-                      
+
                       // 3. Wrap the Last Name TextField in Expanded
                       Expanded(
                         child: TextField(
@@ -188,7 +216,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,6 +242,24 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               child: Text("User Data"), // Set a fixed size for the button
             ),
+
+            const SizedBox(height: 15),
+
+            SizedBox(
+              width: 320,
+              child: SwitchListTile(
+                title: const Text("Keep Screen On During Race"),
+                subtitle: const Text(
+                  "Prevent the screen from turning off while racing.",
+                ),
+                value: keepScreenOn,
+                onChanged: (value) {
+                  _saveScreenSettings(value);
+                },
+              ),
+            ),
+
+            const SizedBox(height: 10),
           ],
         ),
       ),

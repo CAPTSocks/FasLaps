@@ -26,7 +26,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
 
     if (!mounted) return;
     setState(() {
-      savedRaces = races;
+      savedRaces = races.reversed.toList();
       isLoading = false;
     });
   }

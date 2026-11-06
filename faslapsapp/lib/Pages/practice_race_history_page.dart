@@ -28,7 +28,7 @@ class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
     if (!mounted) return;
 
     setState(() {
-      savedRaces = races;
+      savedRaces = races.reversed.toList();
       isLoading = false;
     });
   }
@@ -41,7 +41,7 @@ class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
           title: const Text("Delete Practice?"),
           content: Text(
             "Are you sure you want to delete ${race.raceName}?\n\n"
-            "This will permanently delete this race and its "
+            "This will permanently delete this practice and its "
             "${race.laps.length} saved laps.",
           ),
           actions: [

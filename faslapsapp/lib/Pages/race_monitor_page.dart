@@ -16,6 +16,7 @@ import 'package:faslapsapp/Widgets/race_stats_row.dart';
 import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
 import 'package:faslapsapp/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
 
 class RaceMonitorPage extends StatefulWidget {
@@ -26,6 +27,8 @@ class RaceMonitorPage extends StatefulWidget {
   @override
   State<RaceMonitorPage> createState() => _RaceMonitorPageState();
 }
+
+enum RaceState { waiting, running, paused, finished }
 
 class _RaceMonitorPageState extends State<RaceMonitorPage> {
   final List<LapData> raceHistory = [];
@@ -51,11 +54,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   bool readBestLap = true;
   bool readAverageLap = true;
   bool readFuel = true;
-  bool isRacePaused = false;
   bool showFuelBar = true;
   bool canPauseRace = false;
   bool isMinuteRace = true;
   bool raceSaved = false;
+  bool keepScreenOn = false;
+  RaceState raceState = RaceState.waiting;
 
   void _updateTTSSettings() {
     BackgroundRaceService.setTTSSettings(
@@ -77,7 +81,6 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       readBestLap = prefs.getBool('readBestLap') ?? true;
       readAverageLap = prefs.getBool('readAverageLap') ?? true;
     });
-    
   }
 
   Future<void> _saveTTSSettings() async {
@@ -89,6 +92,26 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     await prefs.setBool('readAverageLap', readAverageLap);
 
     _updateTTSSettings();
+  }
+
+  Future<void> _loadScreenOnSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      keepScreenOn = prefs.getBool('keepScreenOn') ?? false;
+    });
+
+    await _updateScreenAwake();
+  }
+
+  Future<void> _updateScreenAwake() async {
+    if (keepScreenOn && raceState == RaceState.running) {
+      await WakelockPlus.enable();
+    } else {
+      await WakelockPlus.disable();
+    }
   }
 
   @override
@@ -103,6 +126,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
   Future<void> _initializeTTSSettings() async {
     await _loadTTSSettings();
+    await _loadScreenOnSetting();
 
     if (!mounted) return;
 
@@ -131,7 +155,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     //
     // We want the race to continue if the user
     // backgrounds the app or navigates away.
-
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -342,6 +366,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         raceHeat = raceInfo.raceHeat;
         raceInfoReceived = true;
 
+        raceState = RaceState.waiting;
+
         isMinuteRace = raceInfoJson['isMinuteRace'];
         print("Is minute race = $isMinuteRace");
 
@@ -424,11 +450,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       setState(() {
         raceEndTime = null;
         raceElapsed = raceDuration;
-        isRacePaused = false;
+        raceState = RaceState.running;
+        _updateScreenAwake();
       });
 
       _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!mounted || _countdownEndTime == null || isRacePaused) {
+        if (!mounted ||
+            _countdownEndTime == null ||
+            raceState == RaceState.paused) {
           return;
         }
 
@@ -453,7 +482,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
   void _handleRaceFinished(Map data) {
     try {
-      final raceFinished = RaceFinished.fromJson(
+      final raceFinishedData = RaceFinished.fromJson(
         Map<String, dynamic>.from(data),
       );
 
@@ -463,14 +492,13 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       if (!mounted) return;
 
       setState(() {
-        raceEndTime = raceFinished.endTime;
+        raceEndTime = raceFinishedData.endTime;
 
-        // Use the authoritative duration calculated by the server.
         raceElapsed = Duration.zero;
         raceStatus = "Race Completed";
-        _finishRacePop();
 
-        isRacePaused = true;
+        raceState = RaceState.finished;
+        _updateScreenAwake();
       });
 
       debugPrint('Final race time: ${_formatElapsedTime(raceElapsed)}');
@@ -491,7 +519,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   }
 
   void _pauseTimer() {
-    if (isRacePaused) return;
+    if (raceState != RaceState.running) return;
 
     _displayTimer?.cancel();
     _displayTimer = null;
@@ -499,13 +527,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     if (!mounted) return;
 
     setState(() {
-      isRacePaused = true;
+      raceState = RaceState.paused;
+      _updateScreenAwake();
       raceStatus = "Race Paused";
     });
   }
 
   void _resumeTimer() {
-    if (!isRacePaused || _countdownEndTime == null) return;
+    if (raceState != RaceState.paused || _countdownEndTime == null) return;
 
     // Continue counting down from the frozen remaining time.
     _countdownEndTime = DateTime.now().add(raceElapsed);
@@ -513,13 +542,16 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     if (!mounted) return;
 
     setState(() {
-      isRacePaused = false;
+      raceState = RaceState.running;
+      _updateScreenAwake();
     });
 
     _displayTimer?.cancel();
 
     _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted || _countdownEndTime == null || isRacePaused) {
+      if (!mounted ||
+          _countdownEndTime == null ||
+          raceState == RaceState.paused) {
         return;
       }
 
@@ -647,73 +679,29 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
-  Future<void> _finishRacePop() async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("See $raceType results?", textAlign: TextAlign.center),
+  Future<void> _viewResults() async {
+    if (currentRaceInfo == null) return;
 
-          content: Row(
-            spacing: 12,
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 80,
-                  width: 200,
-                  child: FilledButton(
-                    onPressed: () async {
-                      // Save the race first
-                      await RaceHistoryService.saveRace(
-                        currentRaceInfo!,
-                        raceHistory.reversed.toList(),
-                      );
-
-                      // Make sure the widget is still mounted
-                      if (!context.mounted) return;
-
-                      // Close the prompt
-                      Navigator.pop(context);
-
-                      // Navigate based on race type
-                      if (raceType == "Race") {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RaceHistoryPage(),
-                          ),
-                        );
-                      } else if (raceType == "Practice") {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PracticeRaceHistoryPage(),
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text("Yes"),
-                  ),
-                ),
-              ),
-
-              Expanded(
-                child: SizedBox(
-                  height: 80,
-                  width: 200,
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text("No"),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    // Save the race first.
+    await RaceHistoryService.saveRace(
+      currentRaceInfo!,
+      raceHistory.reversed.toList(),
     );
+
+    if (!mounted) return;
+
+    // Navigate based on race type.
+    if (raceType == "Race") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RaceHistoryPage()),
+      );
+    } else if (raceType == "Practice") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PracticeRaceHistoryPage()),
+      );
+    }
   }
 
   @override
@@ -849,21 +837,26 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
               width: double.infinity,
               height: 125,
               child: ElevatedButton.icon(
-                onPressed: (isRacePaused || !canPauseRace)
+                onPressed: raceState == RaceState.finished
+                    ? _viewResults
+                    : (raceState == RaceState.paused || !canPauseRace)
                     ? null
                     : () {
                         BackgroundRaceService.pauseRace();
                         _pauseTimer();
-
-                        setState(() {
-                          isRacePaused = true;
-                        });
                       },
-                icon: isRacePaused
-                    ? const SizedBox.shrink()
-                    : const Icon(Icons.pause, size: 28),
+                icon: Icon(
+                  raceState == RaceState.finished
+                      ? Icons.emoji_events
+                      : Icons.pause,
+                  size: 28,
+                ),
                 label: Text(
-                  isRacePaused ? "RACE PAUSED" : "PAUSE RACE",
+                  raceState == RaceState.finished
+                      ? "VIEW RESULTS"
+                      : raceState == RaceState.paused
+                      ? "RACE PAUSED"
+                      : "PAUSE RACE",
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -871,7 +864,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade800,
+                  backgroundColor: raceState == RaceState.finished
+                      ? Colors.green.shade800
+                      : Colors.red.shade800,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.shade700,
                   disabledForegroundColor: Colors.white70,
