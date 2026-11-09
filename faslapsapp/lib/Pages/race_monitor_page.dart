@@ -18,6 +18,7 @@ import 'package:faslapsapp/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
+import '../widgets/lap_time_graph.dart';
 
 class RaceMonitorPage extends StatefulWidget {
   final String serverAddress;
@@ -60,6 +61,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   bool raceSaved = false;
   bool keepScreenOn = false;
   RaceState raceState = RaceState.waiting;
+  List<double> _recentLapTimes = [];
 
   void _updateTTSSettings() {
     BackgroundRaceService.setTTSSettings(
@@ -273,25 +275,46 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     _resumeTimer();
   }
 
-  void _handleLapData(Map data) {
-    final lapDataJson = data['lapData'];
 
-    if (lapDataJson is! Map) {
-      return;
-    }
+void _handleLapData(Map data) {
+  final lapDataJson = data['lapData'];
 
-    try {
-      final lapData = LapData.fromJson(Map<String, dynamic>.from(lapDataJson));
-
-      if (!mounted) return;
-      lapLeaderCurrentLap = lapData.lapLeaderCurrentLap;
-      setState(() {
-        raceHistory.insert(0, lapData);
-      });
-    } catch (e) {
-      print("Error processing background lap data: $e");
-    }
+  if (lapDataJson is! Map) {
+    print("Invalid lap data received.");
+    return;
   }
+
+  try {
+    final lapData = LapData.fromJson(
+      Map<String, dynamic>.from(lapDataJson),
+    );
+
+    if (!mounted) return;
+
+    print("New lap received: ${lapData.lapTimeSeconds}");
+
+    setState(() {
+      // Add the new lap time to the graph.
+      if (lapData.lapTimeSeconds > 0) {
+        _recentLapTimes.add(lapData.lapTimeSeconds);
+
+        // Keep only the most recent 10 laps.
+        if (_recentLapTimes.length > 100) {
+          _recentLapTimes.removeAt(0);
+        }
+      }
+
+      // Update existing race history.
+      raceHistory.insert(0, lapData);
+
+      lapLeaderCurrentLap = lapData.lapLeaderCurrentLap;
+    });
+  } catch (e, stackTrace) {
+    print("Error processing background lap data: $e");
+    print(stackTrace);
+  }
+}
+
 
   Future<void> _handleRaceHistory(Map data) async {
     final history = data['history'];
@@ -773,15 +796,39 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                       },
                     ),
 
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 1),
                   ] else
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 1),
+
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+
+                          LapTimeGraph(lapTimes: _recentLapTimes),
+                           Center(
+                            child: Text(
+                              'Lap Times - avg ${_calculateAverageLap().toStringAsFixed(3)}s',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+
+                          
+                        ],
+                      ),
+                    ),
+                  ),
 
                   LapTimeTtsRow(
                     title: "Last Lap",
                     value: lastLap.toStringAsFixed(3),
-                    firstColor: Colors.deepOrange,
-                    secondColor: const Color.fromARGB(255, 255, 120, 78),
+                    firstColor: const Color.fromARGB(255, 31, 44, 61),
+                    secondColor: const Color.fromARGB(255, 61, 71, 83),
                     isTtsEnabled: readLastLap,
                     onTtsToggle: () {
                       setState(() {
@@ -795,8 +842,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                   LapTimeTtsRow(
                     title: "Best Lap",
                     value: _calculateBestLap().toStringAsFixed(3),
-                    firstColor: Colors.red,
-                    secondColor: Colors.redAccent,
+                    firstColor: const Color.fromARGB(255, 31, 44, 61),
+                    secondColor: const Color.fromARGB(255, 61, 71, 83),
                     isTtsEnabled: readBestLap,
                     onTtsToggle: () {
                       setState(() {
@@ -807,19 +854,19 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                     },
                   ),
 
-                  LapTimeTtsRow(
-                    title: "Average Lap",
-                    value: _calculateAverageLap().toStringAsFixed(3),
-                    firstColor: Colors.blue,
-                    secondColor: Colors.blueAccent,
-                    isTtsEnabled: readAverageLap,
-                    onTtsToggle: () {
-                      setState(() {
-                        readAverageLap = !readAverageLap;
-                      });
-                      _saveTTSSettings();
-                    },
-                  ),
+                  // LapTimeTtsRow(
+                  //   title: "Average Lap",
+                  //   value: _calculateAverageLap().toStringAsFixed(3),
+                  //   firstColor: Colors.blue,
+                  //   secondColor: Colors.blueAccent,
+                  //   isTtsEnabled: readAverageLap,
+                  //   onTtsToggle: () {
+                  //     setState(() {
+                  //       readAverageLap = !readAverageLap;
+                  //     });
+                  //     _saveTTSSettings();
+                  //   },
+                  // ),
 
                   // Your lap history ListView can eventually go here.
                   //
@@ -835,7 +882,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
             // This stays at the bottom of the screen.
             SizedBox(
               width: double.infinity,
-              height: 125,
+              height: 120,
               child: ElevatedButton.icon(
                 onPressed: raceState == RaceState.finished
                     ? _viewResults

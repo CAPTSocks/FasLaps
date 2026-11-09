@@ -74,6 +74,7 @@ class MainMenuPage extends StatelessWidget {
                 child: Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
+                  color: const Color.fromARGB(255, 36, 42, 59),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: const BorderSide(
@@ -312,7 +313,7 @@ class _MenuButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 28, 28, 34),
+          backgroundColor: const Color.fromARGB(255, 31, 44, 61),
           padding: const EdgeInsets.symmetric(horizontal: 8),
           side: const BorderSide(
             color: Color.fromARGB(255, 180, 67, 6),

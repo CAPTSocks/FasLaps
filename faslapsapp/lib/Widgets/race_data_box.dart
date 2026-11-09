@@ -12,54 +12,52 @@ class RaceDataBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasTitle = title.isNotEmpty;
+    final bool hasTitle = title.trim().isNotEmpty;
 
     return Container(
       padding: EdgeInsets.symmetric(
-        vertical: hasTitle ? 14 : 20,
+        vertical: hasTitle ? 14 : 8,
         horizontal: 8,
       ),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF202020),
-            Color(0xFF4D4D4D),
-          ],
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color.fromARGB(255, 48, 56, 66), Color.fromARGB(255, 31, 44, 61)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Center(
-        child: hasTitle
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                    ),
+      child: hasTitle
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              )
-            : Text(
+                ),
+              ],
+            )
+          : Center(
+              child: Text(
                 value,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 46,
+                  fontSize: 56,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-      ),
+            ),
     );
   }
 }
