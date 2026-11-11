@@ -25,7 +25,7 @@ class RaceStatsRow extends StatelessWidget {
             value: "$currentLap",
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 5),
         Expanded(
           flex: 2,
           child: RaceDataBox(
@@ -33,7 +33,7 @@ class RaceStatsRow extends StatelessWidget {
             value: "$position",
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 5),
         Expanded(
           flex: 3,
           child: RaceDataBox(

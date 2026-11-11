@@ -74,14 +74,13 @@ class MainMenuPage extends StatelessWidget {
                 child: Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
-                  color: const Color.fromARGB(255, 36, 42, 59),
+                  color: const Color.fromARGB(255, 31, 44, 61),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(
-                      color: Color.fromARGB(255, 180, 67, 6),
-                      width: 1.5,
-                    ),
+                    side: BorderSide.none,
                   ),
+                  elevation: 5,
+                  shadowColor: Colors.black.withOpacity(0.4),
                   child: InkWell(
                     onTap: () {
                       Navigator.push(
@@ -310,41 +309,46 @@ class _MenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 70,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 31, 44, 61),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          side: const BorderSide(
-            color: Color.fromARGB(255, 180, 67, 6),
-            width: 1.5,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 26,
-              color: const Color(0xFFEA661E),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.35),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
             ),
           ],
+        ),
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: const Color.fromARGB(255, 31, 44, 61),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 26, color: const Color(0xFFEA661E)),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

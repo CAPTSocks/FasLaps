@@ -1,3 +1,4 @@
+
 import 'lap_data.dart';
 
 class SavedRace {
@@ -7,6 +8,7 @@ class SavedRace {
   final String raceHeat;
   final List<LapData> laps;
   final String raceType;
+  final int raceDurationSeconds;
 
   SavedRace({
     required this.raceId,
@@ -14,7 +16,8 @@ class SavedRace {
     required this.raceDate,
     required this.raceHeat,
     required this.laps,
-    required this.raceType
+    required this.raceType,
+    this.raceDurationSeconds = 0,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,7 +27,8 @@ class SavedRace {
       'raceDate': raceDate.toIso8601String(),
       'raceHeat': raceHeat,
       'laps': laps.map((lap) => lap.toJson()).toList(),
-      'raceType' : raceType,
+      'raceType': raceType,
+      'raceDurationSeconds': raceDurationSeconds,
     };
   }
 
@@ -42,6 +46,8 @@ class SavedRace {
           )
           .toList(),
       raceType: json['raceType'] as String,
+      raceDurationSeconds:
+          (json['raceDurationSeconds'] as num?)?.toInt() ?? 0,
     );
   }
 }

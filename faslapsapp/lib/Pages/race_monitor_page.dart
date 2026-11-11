@@ -17,6 +17,8 @@ import 'package:faslapsapp/Widgets/lap_time_tts_row.dart';
 import 'package:faslapsapp/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+//import 'package:faslapsapp/Pages/race_history_page.dart';
+import 'package:faslapsapp/Pages/race_details_page.dart';
 import 'dart:async';
 import '../widgets/lap_time_graph.dart';
 
@@ -275,46 +277,42 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     _resumeTimer();
   }
 
+  void _handleLapData(Map data) {
+    final lapDataJson = data['lapData'];
 
-void _handleLapData(Map data) {
-  final lapDataJson = data['lapData'];
+    if (lapDataJson is! Map) {
+      print("Invalid lap data received.");
+      return;
+    }
 
-  if (lapDataJson is! Map) {
-    print("Invalid lap data received.");
-    return;
-  }
+    try {
+      final lapData = LapData.fromJson(Map<String, dynamic>.from(lapDataJson));
 
-  try {
-    final lapData = LapData.fromJson(
-      Map<String, dynamic>.from(lapDataJson),
-    );
+      if (!mounted) return;
 
-    if (!mounted) return;
+      print("New lap received: ${lapData.lapTimeSeconds}");
 
-    print("New lap received: ${lapData.lapTimeSeconds}");
+      setState(() {
+        // Add the new lap time to the graph.
+        if (lapData.lapTimeSeconds > 0) {
+          _recentLapTimes.add(lapData.lapTimeSeconds);
 
-    setState(() {
-      // Add the new lap time to the graph.
-      if (lapData.lapTimeSeconds > 0) {
-        _recentLapTimes.add(lapData.lapTimeSeconds);
-
-        // Keep only the most recent 10 laps.
-        if (_recentLapTimes.length > 100) {
-          _recentLapTimes.removeAt(0);
+          // Keep only the most recent 10 laps.
+          if (_recentLapTimes.length > 100) {
+            _recentLapTimes.removeAt(0);
+          }
         }
-      }
 
-      // Update existing race history.
-      raceHistory.insert(0, lapData);
+        // Update existing race history.
+        raceHistory.insert(0, lapData);
 
-      lapLeaderCurrentLap = lapData.lapLeaderCurrentLap;
-    });
-  } catch (e, stackTrace) {
-    print("Error processing background lap data: $e");
-    print(stackTrace);
+        lapLeaderCurrentLap = lapData.lapLeaderCurrentLap;
+      });
+    } catch (e, stackTrace) {
+      print("Error processing background lap data: $e");
+      print(stackTrace);
+    }
   }
-}
-
 
   Future<void> _handleRaceHistory(Map data) async {
     final history = data['history'];
@@ -364,6 +362,7 @@ void _handleLapData(Map data) {
         await RaceHistoryService.saveRace(
           currentRaceInfo!,
           raceHistory.reversed.toList(),
+          raceDurationSeconds: raceElapsed.inSeconds,
         );
       }
 
@@ -517,7 +516,9 @@ void _handleLapData(Map data) {
       setState(() {
         raceEndTime = raceFinishedData.endTime;
 
-        raceElapsed = Duration.zero;
+        // Use the duration calculated by the C# server.
+        raceElapsed = Duration(milliseconds: raceFinishedData.elapsedRaceTime);
+
         raceStatus = "Race Completed";
 
         raceState = RaceState.finished;
@@ -675,6 +676,7 @@ void _handleLapData(Map data) {
       await RaceHistoryService.saveRace(
         currentRaceInfo!,
         raceHistory.reversed.toList(),
+        raceDurationSeconds: raceElapsed.inSeconds,
       );
 
       final savedRaces = await RaceHistoryService.loadRaces();
@@ -702,30 +704,52 @@ void _handleLapData(Map data) {
     }
   }
 
-  Future<void> _viewResults() async {
-    if (currentRaceInfo == null) return;
+Future<void> _viewResults() async {
+  if (currentRaceInfo == null) return;
 
-    // Save the race first.
-    await RaceHistoryService.saveRace(
-      currentRaceInfo!,
-      raceHistory.reversed.toList(),
+  // Save the completed race first.
+  await RaceHistoryService.saveRace(
+    currentRaceInfo!,
+    raceHistory.reversed.toList(),
+    raceDurationSeconds: raceElapsed.inSeconds,
+  );
+
+  if (!mounted) return;
+
+  // Navigate based on race type.
+  if (raceType == "Race") {
+    // Retrieve the newly saved race.
+    final savedRace = await RaceHistoryService.findRace(
+      currentRaceInfo!.raceId,
     );
 
     if (!mounted) return;
 
-    // Navigate based on race type.
-    if (raceType == "Race") {
+    if (savedRace != null) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const RaceHistoryPage()),
+        MaterialPageRoute(
+          builder: (_) => RaceDetailsPage(race: savedRace),
+        ),
       );
-    } else if (raceType == "Practice") {
+    } else {
+      // Fallback if the saved race couldn't be found.
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const PracticeRaceHistoryPage()),
+        MaterialPageRoute(
+          builder: (_) => const RaceHistoryPage(),
+        ),
       );
     }
+  } else if (raceType == "Practice") {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PracticeRaceHistoryPage(),
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -740,191 +764,195 @@ void _handleLapData(Map data) {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RaceHeader(
-                    raceName: raceName,
-                    raceHeat: raceHeat,
-                    status: status,
-                    raceStatus: raceStatus,
-                  ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Available height after the AppBar and system insets.
+          final screenHeight = constraints.maxHeight;
 
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 90,
-                    child: RaceDataBox(
-                      title: "",
-                      value: isMinuteRace
-                          ? _formatElapsedTime(raceElapsed)
-                          : "Laps: $lapLeaderCurrentLap/$lapTotal",
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+          // Determine whether this is a shorter device.
+          final isCompact = screenHeight < 800;
+          final isVeryCompact = screenHeight < 650;
 
-                  RaceStatsRow(
-                    currentLap: raceHistory.isNotEmpty
-                        ? raceHistory.first.lapNumber
-                        : 0,
-                    position: raceHistory.isNotEmpty
-                        ? raceHistory.first.racePosition
-                        : 0,
-                    timeFromLead: raceHistory.isNotEmpty
-                        ? "${raceHistory.first.behindLeaderSeconds.toStringAsFixed(3)}s"
-                        : "0.000s",
-                  ),
+          // Adjust dimensions based on available space.
+          final spacing = isCompact ? 8.0 : 10.0;
+          final graphHeight = isVeryCompact
+              ? 55.0
+              : isCompact
+              ? 100.0
+              : 110.0;
+          final timerHeight = isCompact ? 90.0 : 90.0;
+          final buttonHeight = isVeryCompact ? 75.0 : 120.0;
+          final cardPadding = isCompact ? 10.0 : 12.0;
+          final outerPadding = isCompact ? 12.0 : 16.0;
 
-                  const SizedBox(height: 10),
+          return Padding(
+            padding: EdgeInsets.all(outerPadding),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RaceHeader(
+                        raceName: raceName,
+                        raceHeat: raceHeat,
+                        status: status,
+                        raceStatus: raceStatus,
+                      ),
 
-                  if (showFuelBar) ...[
-                    FuelBar(
-                      fuelAmount: fuelAmount,
-                      isTtsEnabled: readFuel,
-                      onTtsToggle: () {
-                        setState(() {
-                          readFuel = !readFuel;
-                        });
+                      SizedBox(height: spacing),
 
-                        _saveTTSSettings();
-                      },
-                    ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: timerHeight,
+                        child: RaceDataBox(
+                          title: "",
+                          value: isMinuteRace
+                              ? _formatElapsedTime(raceElapsed)
+                              : "Laps: $lapLeaderCurrentLap/$lapTotal",
+                        ),
+                      ),
 
-                    const SizedBox(height: 1),
-                  ] else
-                    const SizedBox(height: 1),
+                      SizedBox(height: spacing),
 
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                      RaceStatsRow(
+                        currentLap: raceHistory.isNotEmpty
+                            ? raceHistory.first.lapNumber
+                            : 0,
+                        position: raceHistory.isNotEmpty
+                            ? raceHistory.first.racePosition
+                            : 0,
+                        timeFromLead: raceHistory.isNotEmpty
+                            ? "${raceHistory.first.behindLeaderSeconds.toStringAsFixed(3)}s"
+                            : "0.000s",
+                      ),
 
-                          LapTimeGraph(lapTimes: _recentLapTimes),
-                           Center(
-                            child: Text(
-                              'Lap Times - avg ${_calculateAverageLap().toStringAsFixed(3)}s',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                      SizedBox(height: spacing),
+
+                      LapTimeTtsRow(
+                        title: "Last Lap",
+                        value: lastLap.toStringAsFixed(3),
+                        firstColor: const Color.fromARGB(255, 31, 44, 61),
+                        secondColor: const Color.fromARGB(255, 61, 71, 83),
+                        compact: isCompact,
+                        isTtsEnabled: readLastLap,
+                        onTtsToggle: () {
+                          setState(() {
+                            readLastLap = !readLastLap;
+                          });
+                          _saveTTSSettings();
+                        },
+                      ),
+
+                      LapTimeTtsRow(
+                        title: "Best Lap",
+                        value: _calculateBestLap().toStringAsFixed(3),
+                        firstColor: const Color.fromARGB(255, 31, 44, 61),
+                        secondColor: const Color.fromARGB(255, 61, 71, 83),
+                        compact: isCompact,
+                        isTtsEnabled: readBestLap,
+                        onTtsToggle: () {
+                          setState(() {
+                            readBestLap = !readBestLap;
+                          });
+                          _saveTTSSettings();
+                        },
+                      ),
+
+                      Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(cardPadding),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: isVeryCompact
+                                    ? 65
+                                    : isCompact
+                                    ? 100
+                                    : 110,
+                                child: LapTimeGraph(lapTimes: _recentLapTimes),
                               ),
-                            ),
-                          ),
 
-                          
-                        ],
+                              Center(
+                                child: Text(
+                                  'Lap Times - AVG time: ${_calculateAverageLap().toStringAsFixed(3)}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      if (showFuelBar) ...[
+                        FuelBar(
+                          fuelAmount: fuelAmount,
+                          isTtsEnabled: readFuel,
+                          onTtsToggle: () {
+                            setState(() {
+                              readFuel = !readFuel;
+                            });
+                            _saveTTSSettings();
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                      ],
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: spacing),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: buttonHeight,
+                  child: ElevatedButton.icon(
+                    onPressed: raceState == RaceState.finished
+                        ? _viewResults
+                        : (raceState == RaceState.paused || !canPauseRace)
+                        ? null
+                        : () {
+                            BackgroundRaceService.pauseRace();
+                            _pauseTimer();
+                          },
+                    icon: Icon(
+                      raceState == RaceState.finished
+                          ? Icons.emoji_events
+                          : Icons.pause,
+                      size: 28,
+                    ),
+                    label: Text(
+                      raceState == RaceState.finished
+                          ? "VIEW RESULTS"
+                          : raceState == RaceState.paused
+                          ? "RACE PAUSED"
+                          : "PAUSE RACE",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: raceState == RaceState.finished
+                          ? Colors.green.shade800
+                          : Colors.red.shade800,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade700,
+                      disabledForegroundColor: Colors.white70,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
-
-                  LapTimeTtsRow(
-                    title: "Last Lap",
-                    value: lastLap.toStringAsFixed(3),
-                    firstColor: const Color.fromARGB(255, 31, 44, 61),
-                    secondColor: const Color.fromARGB(255, 61, 71, 83),
-                    isTtsEnabled: readLastLap,
-                    onTtsToggle: () {
-                      setState(() {
-                        readLastLap = !readLastLap;
-                      });
-                      _saveTTSSettings();
-                      ();
-                    },
-                  ),
-
-                  LapTimeTtsRow(
-                    title: "Best Lap",
-                    value: _calculateBestLap().toStringAsFixed(3),
-                    firstColor: const Color.fromARGB(255, 31, 44, 61),
-                    secondColor: const Color.fromARGB(255, 61, 71, 83),
-                    isTtsEnabled: readBestLap,
-                    onTtsToggle: () {
-                      setState(() {
-                        readBestLap = !readBestLap;
-                      });
-                      _saveTTSSettings();
-                      ();
-                    },
-                  ),
-
-                  // LapTimeTtsRow(
-                  //   title: "Average Lap",
-                  //   value: _calculateAverageLap().toStringAsFixed(3),
-                  //   firstColor: Colors.blue,
-                  //   secondColor: Colors.blueAccent,
-                  //   isTtsEnabled: readAverageLap,
-                  //   onTtsToggle: () {
-                  //     setState(() {
-                  //       readAverageLap = !readAverageLap;
-                  //     });
-                  //     _saveTTSSettings();
-                  //   },
-                  // ),
-
-                  // Your lap history ListView can eventually go here.
-                  //
-                  // Expanded(
-                  //   child: ListView.builder(...)
-                  // ),
-                ],
-              ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 12),
-
-            // This stays at the bottom of the screen.
-            SizedBox(
-              width: double.infinity,
-              height: 120,
-              child: ElevatedButton.icon(
-                onPressed: raceState == RaceState.finished
-                    ? _viewResults
-                    : (raceState == RaceState.paused || !canPauseRace)
-                    ? null
-                    : () {
-                        BackgroundRaceService.pauseRace();
-                        _pauseTimer();
-                      },
-                icon: Icon(
-                  raceState == RaceState.finished
-                      ? Icons.emoji_events
-                      : Icons.pause,
-                  size: 28,
-                ),
-                label: Text(
-                  raceState == RaceState.finished
-                      ? "VIEW RESULTS"
-                      : raceState == RaceState.paused
-                      ? "RACE PAUSED"
-                      : "PAUSE RACE",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: raceState == RaceState.finished
-                      ? Colors.green.shade800
-                      : Colors.red.shade800,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade700,
-                  disabledForegroundColor: Colors.white70,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

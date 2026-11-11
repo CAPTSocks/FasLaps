@@ -69,17 +69,18 @@ class _LapTimeGraphState extends State<LapTimeGraph>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _barAnimation,
-      builder: (context, child) {
-        return CustomPaint(
-          size: const Size(double.infinity, 110),
-          painter: LapTimeGraphPainter(
-            lapTimes: widget.lapTimes,
-            animationProgress: _barAnimation.value,
-          ),
-        );
-      },
+    return SizedBox.expand(
+      child: AnimatedBuilder(
+        animation: _barAnimation,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: LapTimeGraphPainter(
+              lapTimes: widget.lapTimes,
+              animationProgress: _barAnimation.value,
+            ),
+          );
+        },
+      ),
     );
   }
 }

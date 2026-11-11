@@ -4,6 +4,7 @@ import '../Models/saved_race.dart';
 import '../services/race_history_service.dart';
 import 'race_details_page.dart';
 
+
 class RaceHistoryPage extends StatefulWidget {
   const RaceHistoryPage({super.key});
 
@@ -153,10 +154,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
           title: Text(
             race.raceName.isEmpty ? "Race ${index + 1}" : race.raceName,
           ),
-          shape: RoundedRectangleBorder(
-            side: const BorderSide(color: Colors.orange, width: 1.5),
-            borderRadius: BorderRadius.circular(8)
-          ),
+          tileColor: const Color.fromARGB(255, 31, 44, 61),
           subtitle: Text("${race.laps.length} laps"),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,

@@ -47,7 +47,7 @@ class FasLapsQRApp extends StatelessWidget {
           centerTitle: true,
 
           iconTheme: const IconThemeData(
-            color: Color.fromARGB(255, 225, 115, 6),
+            color: Colors.white,
           ),
 
           actionsIconTheme: const IconThemeData(color: Colors.white),
@@ -55,7 +55,7 @@ class FasLapsQRApp extends StatelessWidget {
 
         iconButtonTheme: IconButtonThemeData(
           style: IconButton.styleFrom(
-            backgroundColor: Colors.grey.shade800,
+            backgroundColor: Color.fromARGB(255, 31, 44, 61),
             foregroundColor: Colors.white,
             shape: const CircleBorder(),
           ),
@@ -68,7 +68,7 @@ class FasLapsQRApp extends StatelessWidget {
             
             elevation: 3,
 
-            shadowColor: const Color.fromARGB(255, 225, 115, 6),
+            shadowColor: const Color.fromARGB(255, 31, 44, 61),
 
             minimumSize: const Size(0, 80),
 

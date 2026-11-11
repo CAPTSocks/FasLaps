@@ -20,6 +20,7 @@ class RaceDataBox extends StatelessWidget {
         horizontal: 8,
       ),
       decoration: const BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
         gradient: LinearGradient(
           colors: [Color.fromARGB(255, 48, 56, 66), Color.fromARGB(255, 31, 44, 61)],
           begin: Alignment.topCenter,

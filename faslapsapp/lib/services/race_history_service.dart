@@ -44,9 +44,13 @@ class RaceHistoryService {
     }
   }
 
-  static Future<void> saveRace(RaceInfo raceInfo, List<LapData> laps) async {
+  static Future<void> saveRace(
+    RaceInfo raceInfo,
+    List<LapData> laps, {
+    int raceDurationSeconds = 0,
+  }) async {
     final races = await loadRaces();
-    
+
     final newRace = SavedRace(
       raceId: raceInfo.raceId,
       raceName: raceInfo.raceName,
@@ -54,6 +58,7 @@ class RaceHistoryService {
       raceHeat: raceInfo.raceHeat,
       raceType: raceInfo.raceType,
       laps: List<LapData>.from(laps),
+      raceDurationSeconds: raceDurationSeconds,
     );
 
     final existingIndex = races.indexWhere(
