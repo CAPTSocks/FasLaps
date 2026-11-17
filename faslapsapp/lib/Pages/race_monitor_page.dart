@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 //import 'package:faslapsapp/Pages/race_history_page.dart';
 import 'package:faslapsapp/Pages/race_details_page.dart';
+import 'package:faslapsapp/Theme/app_colors.dart';
 import 'dart:async';
 import '../widgets/lap_time_graph.dart';
 
@@ -64,6 +65,30 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   bool keepScreenOn = false;
   RaceState raceState = RaceState.waiting;
   List<double> _recentLapTimes = [];
+
+  IconData get connectionIcon {
+    switch (status) {
+      case "Connected":
+        return Icons.wifi;
+      case "Disconnected":
+      case "Connection Error":
+        return Icons.wifi_off;
+      default:
+        return Icons.wifi_find;
+    }
+  }
+
+  Color get connectionColor {
+    switch (status) {
+      case "Connected":
+        return Colors.green;
+      case "Disconnected":
+      case "Connection Error":
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
 
   void _updateTTSSettings() {
     BackgroundRaceService.setTTSSettings(
@@ -383,30 +408,58 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       if (!mounted) return;
 
+      // Stop any timer left over from the previous race.
+      _displayTimer?.cancel();
+      _displayTimer = null;
+
       setState(() {
+        // Reset all race-specific values for the new race.
         raceName = raceInfo.raceName;
         raceHeat = raceInfo.raceHeat;
+        raceType = raceInfo.raceType;
         raceInfoReceived = true;
-
         raceState = RaceState.waiting;
+        raceStatus = "Waiting for Race to Begin";
+        raceSaved = false;
 
-        isMinuteRace = raceInfoJson['isMinuteRace'];
-        print("Is minute race = $isMinuteRace");
+        raceStartTime = null;
+        raceEndTime = null;
+        _countdownEndTime = null;
 
+        fuelAmount = 100;
+        currentLap = 0;
+        lapLeaderCurrentLap = 0;
+        lapTotal = 0;
+
+        isMinuteRace = raceInfoJson['isMinuteRace'] == true;
+        raceElapsed = isMinuteRace
+            ? Duration(minutes: raceInfo.raceLength)
+            : Duration.zero;
         if (!isMinuteRace) {
-          lapTotal = raceInfoJson['raceLength'];
-        } else {
-          raceElapsed = Duration(minutes: raceInfo.raceLength);
+          lapTotal = raceInfo.raceLength;
         }
 
         showFuelBar = showFuelBarValue is bool ? showFuelBarValue : true;
-
         canPauseRace = canPauseRaceValue is bool ? canPauseRaceValue : true;
 
+        // Reset both the race stats and the graph: they use separate lists.
         raceHistory
           ..clear()
           ..addAll(existingRace?.laps.reversed ?? []);
+        _recentLapTimes = existingRace == null
+            ? []
+            : existingRace.laps
+                  .map((lap) => lap.lapTimeSeconds)
+                  .where((time) => time > 0)
+                  .toList()
+                  .reversed
+                  .take(100)
+                  .toList()
+                  .reversed
+                  .toList();
       });
+
+      _updateScreenAwake();
 
       if (existingRace != null) {
         print(
@@ -704,255 +757,351 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
     }
   }
 
-Future<void> _viewResults() async {
-  if (currentRaceInfo == null) return;
+  Future<void> _viewResults() async {
+    if (currentRaceInfo == null) return;
 
-  // Save the completed race first.
-  await RaceHistoryService.saveRace(
-    currentRaceInfo!,
-    raceHistory.reversed.toList(),
-    raceDurationSeconds: raceElapsed.inSeconds,
-  );
-
-  if (!mounted) return;
-
-  // Navigate based on race type.
-  if (raceType == "Race") {
-    // Retrieve the newly saved race.
-    final savedRace = await RaceHistoryService.findRace(
-      currentRaceInfo!.raceId,
+    // Save the completed race first.
+    await RaceHistoryService.saveRace(
+      currentRaceInfo!,
+      raceHistory.reversed.toList(),
+      raceDurationSeconds: raceElapsed.inSeconds,
     );
 
     if (!mounted) return;
 
-    if (savedRace != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RaceDetailsPage(race: savedRace),
-        ),
+    // Navigate based on race type.
+    if (raceType == "Race") {
+      // Retrieve the newly saved race.
+      final savedRace = await RaceHistoryService.findRace(
+        currentRaceInfo!.raceId,
       );
-    } else {
-      // Fallback if the saved race couldn't be found.
+
+      if (!mounted) return;
+
+      if (savedRace != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => RaceDetailsPage(race: savedRace)),
+        );
+      } else {
+        // Fallback if the saved race couldn't be found.
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RaceHistoryPage()),
+        );
+      }
+    } else if (raceType == "Practice") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const RaceHistoryPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const PracticeRaceHistoryPage()),
       );
     }
-  } else if (raceType == "Practice") {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const PracticeRaceHistoryPage(),
-      ),
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Race Monitor"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: "Stop Race",
-            onPressed: _leaveRace,
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          // Available height after the AppBar and system insets.
-          final screenHeight = constraints.maxHeight;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text("Race Monitor"),
+          actions: [
+            // Connection status indicator
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Tooltip(
+                message: status,
+                child: Icon(connectionIcon, color: connectionColor, size: 28),
+              ),
+            ),
 
-          // Determine whether this is a shorter device.
-          final isCompact = screenHeight < 800;
-          final isVeryCompact = screenHeight < 650;
+            // Disconnect button
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: "Stop Race",
+              onPressed: _leaveRace,
+            ),
+          ],
+        ),
 
-          // Adjust dimensions based on available space.
-          final spacing = isCompact ? 8.0 : 10.0;
-          final graphHeight = isVeryCompact
-              ? 55.0
-              : isCompact
-              ? 100.0
-              : 110.0;
-          final timerHeight = isCompact ? 90.0 : 90.0;
-          final buttonHeight = isVeryCompact ? 75.0 : 120.0;
-          final cardPadding = isCompact ? 10.0 : 12.0;
-          final outerPadding = isCompact ? 12.0 : 16.0;
+        body: SafeArea(
+          top: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screenHeight = constraints.maxHeight;
+              final screenWidth = constraints.maxWidth;
 
-          return Padding(
-            padding: EdgeInsets.all(outerPadding),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RaceHeader(
-                        raceName: raceName,
-                        raceHeat: raceHeat,
-                        status: status,
-                        raceStatus: raceStatus,
-                      ),
+              // Determine how compact the layout should be.
+              // Both height and width matter for foldable phones.
+              final isCompact = screenHeight < 800 || screenWidth < 400;
 
-                      SizedBox(height: spacing),
+              final isVeryCompact = screenHeight < 680 || screenWidth < 350;
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: timerHeight,
-                        child: RaceDataBox(
-                          title: "",
-                          value: isMinuteRace
-                              ? _formatElapsedTime(raceElapsed)
-                              : "Laps: $lapLeaderCurrentLap/$lapTotal",
-                        ),
-                      ),
+              // Reduce unused space on smaller screens.
+              final spacing = isVeryCompact
+                  ? 4.0
+                  : isCompact
+                  ? 6.0
+                  : 10.0;
 
-                      SizedBox(height: spacing),
+              final outerPadding = isVeryCompact
+                  ? 8.0
+                  : isCompact
+                  ? 12.0
+                  : 16.0;
 
-                      RaceStatsRow(
-                        currentLap: raceHistory.isNotEmpty
-                            ? raceHistory.first.lapNumber
-                            : 0,
-                        position: raceHistory.isNotEmpty
-                            ? raceHistory.first.racePosition
-                            : 0,
-                        timeFromLead: raceHistory.isNotEmpty
-                            ? "${raceHistory.first.behindLeaderSeconds.toStringAsFixed(3)}s"
-                            : "0.000s",
-                      ),
+              final cardPadding = isVeryCompact
+                  ? 6.0
+                  : isCompact
+                  ? 8.0
+                  : 12.0;
 
-                      SizedBox(height: spacing),
+              // Timer and graph can shrink on smaller screens.
+              final timerHeight = isVeryCompact
+                  ? 72.0
+                  : isCompact
+                  ? 82.0
+                  : 90.0;
 
-                      LapTimeTtsRow(
-                        title: "Last Lap",
-                        value: lastLap.toStringAsFixed(3),
-                        firstColor: const Color.fromARGB(255, 31, 44, 61),
-                        secondColor: const Color.fromARGB(255, 61, 71, 83),
-                        compact: isCompact,
-                        isTtsEnabled: readLastLap,
-                        onTtsToggle: () {
-                          setState(() {
-                            readLastLap = !readLastLap;
-                          });
-                          _saveTTSSettings();
-                        },
-                      ),
+              final graphHeight = isVeryCompact
+                  ? 60.0
+                  : isCompact
+                  ? 85.0
+                  : 110.0;
 
-                      LapTimeTtsRow(
-                        title: "Best Lap",
-                        value: _calculateBestLap().toStringAsFixed(3),
-                        firstColor: const Color.fromARGB(255, 31, 44, 61),
-                        secondColor: const Color.fromARGB(255, 61, 71, 83),
-                        compact: isCompact,
-                        isTtsEnabled: readBestLap,
-                        onTtsToggle: () {
-                          setState(() {
-                            readBestLap = !readBestLap;
-                          });
-                          _saveTTSSettings();
-                        },
-                      ),
+              // Keep the bottom button large.
+              // It is NOT included in the scalable content.
+              final buttonHeight = screenHeight < 650
+                  ? 88.0
+                  : screenHeight < 780
+                  ? 105.0
+                  : 120.0;
 
-                      Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(cardPadding),
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: isVeryCompact
-                                    ? 65
-                                    : isCompact
-                                    ? 100
-                                    : 110,
-                                child: LapTimeGraph(lapTimes: _recentLapTimes),
-                              ),
+              return Padding(
+                padding: EdgeInsets.all(outerPadding),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 650),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ==================================
+                        // RESPONSIVE RACE INFORMATION
+                        // ==================================
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, contentConstraints) {
+                              // Give the widgets enough layout
+                              // width, even on narrow screens.
+                              // FittedBox will scale this down
+                              // to the actual available width.
+                              final designWidth =
+                                  contentConstraints.maxWidth < 380
+                                  ? 380.0
+                                  : contentConstraints.maxWidth;
 
-                              Center(
-                                child: Text(
-                                  'Lap Times - AVG time: ${_calculateAverageLap().toStringAsFixed(3)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
+                              return FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.topCenter,
+                                child: SizedBox(
+                                  width: designWidth,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      RaceHeader(
+                                        raceName: raceName,
+                                        raceHeat: raceHeat,
+                                        raceStatus: raceStatus,
+                                      ),
+
+                                      SizedBox(height: spacing),
+
+                                      // RACE TIMER
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: timerHeight,
+                                        child: RaceDataBox(
+                                          title: "",
+                                          value: isMinuteRace
+                                              ? _formatElapsedTime(raceElapsed)
+                                              : "Laps: $lapLeaderCurrentLap/$lapTotal",
+                                        ),
+                                      ),
+
+                                      SizedBox(height: spacing),
+
+                                      // RACE STATS
+                                      RaceStatsRow(
+                                        currentLap: raceHistory.isNotEmpty
+                                            ? raceHistory.first.lapNumber
+                                            : 0,
+                                        position: raceHistory.isNotEmpty
+                                            ? raceHistory.first.racePosition
+                                            : 0,
+                                        timeFromLead: raceHistory.isNotEmpty
+                                            ? "${raceHistory.first.behindLeaderSeconds.toStringAsFixed(3)}s"
+                                            : "0.000s",
+                                      ),
+
+                                      SizedBox(height: spacing),
+
+                                      // LAST LAP
+                                      LapTimeTtsRow(
+                                        title: "Last Lap",
+                                        value: lastLap.toStringAsFixed(3),
+                                        firstColor: AppColors.primary,
+                                        secondColor: AppColors.primaryGradiant,
+                                        compact: isCompact,
+                                        isTtsEnabled: readLastLap,
+                                        onTtsToggle: () {
+                                          setState(() {
+                                            readLastLap = !readLastLap;
+                                          });
+                                          _saveTTSSettings();
+                                        },
+                                      ),
+
+                                      // BEST LAP
+                                      LapTimeTtsRow(
+                                        title: "Best Lap",
+                                        value: _calculateBestLap()
+                                            .toStringAsFixed(3),
+                                        firstColor: AppColors.primary,
+                                        secondColor: AppColors.primaryGradiant,
+                                        compact: isCompact,
+                                        isTtsEnabled: readBestLap,
+                                        onTtsToggle: () {
+                                          setState(() {
+                                            readBestLap = !readBestLap;
+                                          });
+                                          _saveTTSSettings();
+                                        },
+                                      ),
+
+                                      // LAP TIME GRAPH
+                                      Card(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(cardPadding),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                height: graphHeight,
+                                                child: KeyedSubtree(
+                                                  // Reset any internal graph state when
+                                                  // a different race is configured.
+                                                  key: ValueKey(
+                                                    currentRaceInfo?.raceId,
+                                                  ),
+                                                  child: LapTimeGraph(
+                                                    lapTimes: _recentLapTimes,
+                                                  ),
+                                                ),
+                                              ),
+
+                                              Center(
+                                                child: Text(
+                                                  'Lap Times - AVG time: '
+                                                  '${_calculateAverageLap().toStringAsFixed(3)}',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: isVeryCompact
+                                                        ? 12
+                                                        : 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+
+                                      // FUEL BAR
+                                      if (showFuelBar) ...[
+                                        FuelBar(
+                                          fuelAmount: fuelAmount,
+                                          isTtsEnabled: readFuel,
+                                          onTtsToggle: () {
+                                            setState(() {
+                                              readFuel = !readFuel;
+                                            });
+                                            _saveTTSSettings();
+                                          },
+                                        ),
+                                        const SizedBox(height: 2),
+                                      ],
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
-                      ),
 
-                      if (showFuelBar) ...[
-                        FuelBar(
-                          fuelAmount: fuelAmount,
-                          isTtsEnabled: readFuel,
-                          onTtsToggle: () {
-                            setState(() {
-                              readFuel = !readFuel;
-                            });
-                            _saveTTSSettings();
-                          },
+                        SizedBox(height: spacing),
+
+                        // ==================================
+                        // FIXED LARGE ACTION BUTTON
+                        // ==================================
+                        SizedBox(
+                          width: double.infinity,
+                          height: buttonHeight,
+                          child: ElevatedButton.icon(
+                            onPressed: raceState == RaceState.finished
+                                ? _viewResults
+                                : (raceState == RaceState.paused ||
+                                      !canPauseRace)
+                                ? null
+                                : () {
+                                    BackgroundRaceService.pauseRace();
+                                    _pauseTimer();
+                                  },
+                            icon: Icon(
+                              raceState == RaceState.finished
+                                  ? Icons.emoji_events
+                                  : Icons.pause,
+                              size: 28,
+                            ),
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                raceState == RaceState.finished
+                                    ? "VIEW RESULTS"
+                                    : raceState == RaceState.paused
+                                    ? "RACE PAUSED"
+                                    : "PAUSE RACE",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: raceState == RaceState.finished
+                                  ? Colors.green.shade800
+                                  : Colors.red.shade800,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey.shade700,
+                              disabledForegroundColor: Colors.white70,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 2),
                       ],
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: spacing),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: buttonHeight,
-                  child: ElevatedButton.icon(
-                    onPressed: raceState == RaceState.finished
-                        ? _viewResults
-                        : (raceState == RaceState.paused || !canPauseRace)
-                        ? null
-                        : () {
-                            BackgroundRaceService.pauseRace();
-                            _pauseTimer();
-                          },
-                    icon: Icon(
-                      raceState == RaceState.finished
-                          ? Icons.emoji_events
-                          : Icons.pause,
-                      size: 28,
-                    ),
-                    label: Text(
-                      raceState == RaceState.finished
-                          ? "VIEW RESULTS"
-                          : raceState == RaceState.paused
-                          ? "RACE PAUSED"
-                          : "PAUSE RACE",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: raceState == RaceState.finished
-                          ? Colors.green.shade800
-                          : Colors.red.shade800,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade700,
-                      disabledForegroundColor: Colors.white70,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }

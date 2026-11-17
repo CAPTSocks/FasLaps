@@ -56,21 +56,14 @@ class TtsService {
     required double averageLap,
     required bool readLastLap,
     required bool readBestLap,
-    required bool readAverageLap,
   }) async {
     final parts = <String>[];
 
-    if (readLastLap) {
+    if (bestLap == lap.lapTimeSeconds && readBestLap) {
+      parts.add("Best lap ${bestLap.toStringAsFixed(2)} seconds.");
+    }
+    else if (readLastLap) {
       parts.add("Last lap ${lap.lapTimeSeconds.toStringAsFixed(2)} seconds.");
-    }
-
-    if (readBestLap && bestLap != lap.lapTimeSeconds) {
-      parts.add("Best lap ${bestLap.toStringAsFixed(2)} seconds.");
-      parts.add("Best lap ${bestLap.toStringAsFixed(2)} seconds.");
-    }
-
-    if (readAverageLap) {
-      parts.add("Average lap ${averageLap.toStringAsFixed(2)} seconds.");
     }
 
     if (parts.isEmpty) {

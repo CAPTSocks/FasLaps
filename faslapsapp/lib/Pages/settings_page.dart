@@ -225,39 +225,88 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FilledButton(
-              onPressed: () {
-                _changeTtsSettings(context);
-              },
-              child: Text("Text To Speech Settings"),
-            ),
-            FilledButton(
-              onPressed: () {
-                _changeUserSettings(context);
-              },
-              style: ButtonStyle(
-                minimumSize: WidgetStatePropertyAll(
-                  Size(200, 50),
-                ), // Set a fixed size for the button
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton(
+                    onPressed: () {
+                      _changeTtsSettings(context);
+                    },
+                    child: const Text("Text To Speech Settings"),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  FilledButton(
+                    onPressed: () {
+                      _changeUserSettings(context);
+                    },
+                    child: const Text("User Data"),
+                  ),
+                ],
               ),
-              child: Text("User Data"), // Set a fixed size for the button
             ),
 
             const SizedBox(height: 15),
 
-            SizedBox(
-              width: 320,
-              child: SwitchListTile(
-                title: const Text("Keep Screen On During Race"),
-                subtitle: const Text(
-                  "Prevent the screen from turning off while racing.",
-                ),
-                value: keepScreenOn,
-                onChanged: (value) {
-                  _saveScreenSettings(value);
-                },
+         
+ConstrainedBox(
+  constraints: const BoxConstraints(maxWidth: 300),
+  child: Material(
+    color: const Color.fromARGB(255, 31, 44, 61),
+    borderRadius: BorderRadius.circular(15),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: () {
+        _saveScreenSettings(!keepScreenOn);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text(
+                    "Keep Screen On",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    "Prevent screen timeout during races.",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            const SizedBox(width: 8),
+
+            Switch(
+              value: keepScreenOn,
+              onChanged: _saveScreenSettings,
+            ),
+          ],
+        ),
+      ),
+    ),
+  ),
+),
+
 
             const SizedBox(height: 10),
           ],

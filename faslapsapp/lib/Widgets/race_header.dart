@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 class RaceHeader extends StatelessWidget {
   final String raceName;
   final String raceHeat;
-  final String status;
   final String raceStatus;
 
   const RaceHeader({
     super.key,
     required this.raceName,
     required this.raceHeat,
-    required this.status,
     required this.raceStatus,
   });
 
@@ -41,12 +39,6 @@ class RaceHeader extends StatelessWidget {
               ),
             ),
           ],
-        ),
-        Text(
-          "Status: $status",
-          style: textTheme.titleSmall?.copyWith(
-            color: status == 'Connected' ? Colors.green : Colors.red,
-          ),
         ),
         Text("$raceStatus", style: textTheme.titleSmall),
       ],

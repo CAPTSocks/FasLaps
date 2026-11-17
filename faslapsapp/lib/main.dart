@@ -3,7 +3,7 @@ import 'package:faslapsapp/Pages/startup_page.dart';
 import 'Services/tts_service.dart';
 import 'services/notification_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-
+import 'Theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,51 +42,7 @@ class FasLapsQRApp extends StatelessWidget {
     return MaterialApp(
       title: 'FasLaps QR Reader',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-
-          iconTheme: const IconThemeData(
-            color: Colors.white,
-          ),
-
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-        ),
-
-        iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(
-            backgroundColor: Color.fromARGB(255, 31, 44, 61),
-            foregroundColor: Colors.white,
-            shape: const CircleBorder(),
-          ),
-        ),
-
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 47, 50, 53),
-            foregroundColor: Colors.white,
-            
-            elevation: 3,
-
-            shadowColor: const Color.fromARGB(255, 31, 44, 61),
-
-            minimumSize: const Size(0, 80),
-
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 15),
-
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: Color.fromARGB(255, 234, 102, 30), width: 2),
-            ),
-
-            textStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      ),
+      theme: AppTheme.darkTheme,
       home: const StartupPage(),
     );
   }

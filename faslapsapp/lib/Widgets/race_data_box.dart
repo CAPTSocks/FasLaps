@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:faslapsapp/Theme/app_colors.dart';
 
 class RaceDataBox extends StatelessWidget {
   final String title;
@@ -22,7 +23,7 @@ class RaceDataBox extends StatelessWidget {
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.all(Radius.circular(8)),
         gradient: LinearGradient(
-          colors: [Color.fromARGB(255, 48, 56, 66), Color.fromARGB(255, 31, 44, 61)],
+          colors: [AppColors.primaryGradiant, AppColors.primary],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),

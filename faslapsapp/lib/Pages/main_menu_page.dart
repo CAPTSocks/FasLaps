@@ -6,6 +6,7 @@ import 'package:faslapsapp/Pages/practice_race_history_page.dart';
 import '../services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'race_monitor_page.dart';
+import '../Theme/app_colors.dart';
 import 'my_cars_page.dart';
 
 class MainMenuPage extends StatelessWidget {
@@ -70,11 +71,11 @@ class MainMenuPage extends StatelessWidget {
 
               // Main action: Connect to Race
               SizedBox(
-                height: 100,
+                height: 110,
                 child: Card(
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
-                  color: const Color.fromARGB(255, 31, 44, 61),
+                  color: AppColors.primary, // Use the primary color from AppColors
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: BorderSide.none,
@@ -323,7 +324,7 @@ class _MenuButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 31, 44, 61),
+            backgroundColor: AppColors.primary, // Use the primary color from AppColors
             padding: const EdgeInsets.symmetric(horizontal: 8),
             side: BorderSide.none,
             shape: RoundedRectangleBorder(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../Theme/app_colors.dart';
 import '../Models/saved_race.dart';
 import '../services/race_history_service.dart';
 import 'race_details_page.dart';
@@ -37,8 +37,10 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: AppColors.primary,
           title: const Text("Delete Race?"),
-          content: Text(
+          content: 
+          Text(
             "Are you sure you want to delete ${race.raceName}?\n\n"
             "This will permanently delete this race and its "
             "${race.laps.length} saved laps.",
@@ -48,7 +50,7 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
               onPressed: () {
                 Navigator.pop(context, false);
               },
-              child: const Text("Cancel"),
+              child: const Text("Cancel", style: TextStyle(color: Colors.white)),
             ),
             TextButton(
               onPressed: () {
@@ -80,18 +82,23 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: AppColors.primary,
           title: const Text("Clear Race History?"),
-          content: Text(
-            "Are you sure you want to delete all "
-            "${savedRaces.length} saved races?\n\n"
-            "This cannot be undone.",
-          ),
+          content:
+            Container(
+              //color: AppColors.primary,
+              child: Text(
+                "Are you sure you want to delete all "
+                "${savedRaces.length} saved races?\n\n"
+                "This cannot be undone.",
+              ),
+            ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context, false);
               },
-              child: const Text("Cancel"),
+              child: const Text("Cancel", style: TextStyle(color: Colors.white)),
             ),
             TextButton(
               onPressed: () {
@@ -154,12 +161,12 @@ class _RaceHistoryPageState extends State<RaceHistoryPage> {
           title: Text(
             race.raceName.isEmpty ? "Race ${index + 1}" : race.raceName,
           ),
-          tileColor: const Color.fromARGB(255, 31, 44, 61),
+          tileColor: AppColors.primary,
           subtitle: Text("${race.laps.length} laps"),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_formatDate(race.raceDate)),
+              Text(_formatDate(race.raceDate), style: const TextStyle(fontSize: 13)),
               IconButton(
                 icon: const Icon(Icons.delete),
                 tooltip: "Delete Race",

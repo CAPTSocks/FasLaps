@@ -355,7 +355,6 @@ class RaceTaskHandler extends TaskHandler {
         averageLap: averageLap,
         readLastLap: _readLastLap,
         readBestLap: _readBestLap,
-        readAverageLap: _readAverageLap,
       );
     } catch (e, stack) {
       print("Error handling lap data:");

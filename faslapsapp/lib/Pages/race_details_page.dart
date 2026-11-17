@@ -137,10 +137,15 @@ class RaceDetailsPage extends StatelessWidget {
                   ),
                   Expanded(
                     flex: 2,
-                    child: Text(
-                      "Behind Leader",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "Behind Leader",
+                        maxLines: 1,
+                        softWrap: false,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -218,29 +223,39 @@ class RaceDetailsPage extends StatelessWidget {
   }
 
   // Individual statistics card.
+
   Widget _statCard(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       decoration: BoxDecoration(
-        color: Color.fromARGB(255, 31, 44, 61),
+        color: const Color.fromARGB(255, 31, 44, 61),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
+
           const SizedBox(height: 5),
+
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               value,
+              maxLines: 1,
+              softWrap: false,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -255,11 +270,14 @@ class RaceDetailsPage extends StatelessWidget {
 
   Widget _buildFastestLaps(BuildContext context, List<dynamic> fastestLaps) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+final textScale = (screenWidth / 400).clamp(1.0, 1.8);
 
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Color.fromARGB(255, 31, 44, 61),
+        color: const Color.fromARGB(255, 31, 44, 61),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -275,6 +293,7 @@ class RaceDetailsPage extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(height: 2),
 
           if (fastestLaps.isEmpty)
@@ -287,7 +306,7 @@ class RaceDetailsPage extends StatelessWidget {
 
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -295,7 +314,7 @@ class RaceDetailsPage extends StatelessWidget {
                           aspectRatio: 1.2,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Color.fromARGB(255, 53, 75, 104),
+                              color: const Color.fromARGB(255, 53, 75, 104),
                               borderRadius: BorderRadius.circular(6),
                               boxShadow: [
                                 BoxShadow(
@@ -304,51 +323,60 @@ class RaceDetailsPage extends StatelessWidget {
                                   offset: const Offset(0, 2),
                                 ),
                               ],
-                              // border: Border.all(
-                              //   color: theme.colorScheme.outlineVariant,
-                              // ),
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "#${index + 1}",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: index == 0
-                                        ? Colors.orange
-                                        : theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                                Text(
-                                  "${lap.lapTimeSeconds.toStringAsFixed(2)}s",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  "Lap# ${lap.lapNumber.toStringAsFixed(0)}",
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
 
-                                // Icon(
-                                //   Icons.image_outlined,
-                                //   size: 26,
-                                //   color: theme.colorScheme.onSurfaceVariant,
-                                // ),
-                              ],
+                            // Scale all three lines together
+                            // when the card becomes too small.
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      "#${index + 1}",
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                        fontSize: 11 * textScale,
+                                        height: 1.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: index == 0
+                                            ? Colors.orange
+                                            : theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+
+                                    Text(
+                                      "${lap.lapTimeSeconds.toStringAsFixed(2)}s",
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style:  TextStyle(
+                                        fontSize: 12 * textScale,
+                                        height: 1.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    Text(
+                                      "Lap# ${lap.lapNumber.toStringAsFixed(0)}",
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style:  TextStyle(
+                                        fontSize: 10 * textScale,
+                                        height: 1.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
+
                         const SizedBox(height: 4),
                       ],
                     ),

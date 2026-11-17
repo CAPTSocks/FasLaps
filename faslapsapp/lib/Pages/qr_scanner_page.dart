@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-
+import '../Theme/app_colors.dart';
 import 'race_monitor_page.dart';
 
 Uri buildWebSocketUri(String input) {
@@ -351,12 +351,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: FilledButton.icon(
                   icon: const Icon(Icons.keyboard),
                   label: const Text("Enter IP Address Manually"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white70),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
                   ),
                   onPressed: () {
                     setState(() {
