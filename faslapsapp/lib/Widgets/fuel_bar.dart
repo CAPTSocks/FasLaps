@@ -14,7 +14,7 @@ class FuelBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int activeBars = (fuelAmount / 10).ceil();
+    final int activeBars = (fuelAmount.clamp(0, 100) / 10).ceil();
 
     final Color fuelColor = fuelAmount > 50
         ? Colors.green
@@ -27,64 +27,69 @@ class FuelBar extends StatelessWidget {
       children: [
         Expanded(
           child: Container(
+            height: 72,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: const Color(0xFF202020),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: const Color.fromARGB(255, 74, 74, 74),
-                width: 3,
-              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF4A4A4A), width: 3),
             ),
-            child: Stack(
-              alignment: Alignment.center,
+            child: Row(
               children: [
-                Row(
-                  children: List.generate(10, (index) {
-                    final bool isActive = index < activeBars;
-
-                    return Expanded(
-                      child: Container(
-                        height: 50,
-                        margin: EdgeInsets.only(right: index == 9 ? 0 : 4),
-                        decoration: BoxDecoration(
-                          color: isActive ? fuelColor : const Color(0xFF303030),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                    );
-                  }),
+                // Fuel pump icon on the left.
+                Container(
+                  width: 42,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF263343),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: const Icon(
+                    Icons.local_gas_station,
+                    size: 28,
+                    color: Colors.orange,
+                  ),
                 ),
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.local_gas_station,
-                      size: 34,
-                      color: Colors.orange,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black,
-                          blurRadius: 60,
-                          offset: Offset(1, 1),
+
+                const SizedBox(width: 6),
+
+                // Fuel level segments.
+                Expanded(
+                  child: Row(
+                    children: List.generate(10, (index) {
+                      final bool isActive = index < activeBars;
+
+                      return Expanded(
+                        child: Container(
+                          height: 50,
+                          margin: EdgeInsets.only(right: index == 9 ? 0 : 3),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? fuelColor
+                                : const Color(0xFF303030),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
-                      ],
-                    ),
-                  ],
+                      );
+                    }),
+                  ),
                 ),
               ],
             ),
           ),
         ),
+
         const SizedBox(width: 8),
+
+        // Fuel TTS toggle.
         SizedBox(
           width: 65,
-          height: 65,
+          height: 72,
           child: IconButton(
             onPressed: onTtsToggle,
             icon: Icon(isTtsEnabled ? Icons.volume_up : Icons.volume_off),
             color: Colors.white,
-            tooltip: isTtsEnabled ? "Disable TTS" : "Enable TTS",
+            tooltip: isTtsEnabled ? 'Disable TTS' : 'Enable TTS',
             style: IconButton.styleFrom(
               backgroundColor: isTtsEnabled
                   ? Colors.green.shade700

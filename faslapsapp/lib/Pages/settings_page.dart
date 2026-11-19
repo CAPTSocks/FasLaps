@@ -66,7 +66,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     min: 0.0,
                     max: 1.0,
                     divisions: 10,
-                    label: "Volume: ${newVolume.toStringAsFixed(1)}",
+                    //label: "Volume: ${newVolume.toStringAsFixed(1)}",
                     onChanged: (double value) {
                       setState(() {
                         newVolume = value;
@@ -99,6 +99,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
 
                   FilledButton(
+                     style: FilledButton.styleFrom(
+                       shadowColor: Colors.black,
+                       elevation: 3,
+                    ),
                     onPressed: () async {
                       await ttsService.setSpeechRate(newRate);
                       await ttsService.setVolume(newVolume);
@@ -181,6 +185,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 8),
                   TextField(
                     decoration: const InputDecoration(
                       labelText: "Pin",
@@ -188,7 +194,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
 
+                  const SizedBox(height: 15),
+
+
+                  //TODO: Remove this before release. This is just for testing purposes.
                   FilledButton(
+                     style: FilledButton.styleFrom(
+                       shadowColor: Colors.black,
+                       elevation: 3,
+                    ),
                     onPressed: () {
                       _clearUserData();
                     },

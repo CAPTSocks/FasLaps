@@ -69,12 +69,12 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   IconData get connectionIcon {
     switch (status) {
       case "Connected":
-        return Icons.wifi;
+        return Icons.link;
       case "Disconnected":
       case "Connection Error":
-        return Icons.wifi_off;
+        return Icons.link_off;
       default:
-        return Icons.wifi_find;
+        return Icons.search;
     }
   }
 

@@ -7,7 +7,7 @@ import '../services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'race_monitor_page.dart';
 import '../Theme/app_colors.dart';
-import 'my_cars_page.dart';
+//import 'my_cars_page.dart';
 
 class MainMenuPage extends StatelessWidget {
   final String firstName;
