@@ -27,6 +27,13 @@ class RaceTaskHandler extends TaskHandler {
   final TtsService _ttsService = TtsService.instance;
 
   bool _isConnecting = false;
+  bool _shouldReconnect = false;
+  String? _serverAddress;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
+  int _connectionGeneration = 0;
+  String? _currentRaceId;
+
 
   bool _readLastLap = true;
   bool _readBestLap = true;
@@ -73,8 +80,13 @@ class RaceTaskHandler extends TaskHandler {
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     print("FasLaps background service stopped");
 
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _connectionGeneration++;
     await _socketSubscription?.cancel();
     await _socketChannel?.sink.close();
+    _socketSubscription = null;
+    _socketChannel = null;
 
     //await _ttsService.stop();
   }
@@ -103,6 +115,10 @@ class RaceTaskHandler extends TaskHandler {
         if (serverAddress is String) {
           _connectToServer(serverAddress);
         }
+        break;
+
+      case 'disconnect':
+        _disconnectFromServer();
         break;
 
       case 'getRaceHistory':
@@ -155,100 +171,179 @@ class RaceTaskHandler extends TaskHandler {
     );
   }
 
+  // The UI supplies the hostname/IP, without a ws:// prefix or port.
   Future<void> _connectToServer(String serverAddress) async {
-    if (_isConnecting) {
-      print("Already connecting to the race server.");
-      return;
+    final address = serverAddress.trim();
+    if (address.isEmpty) return;
+
+    // A manual change of server is different from retrying the same server.
+    if (_serverAddress != address) {
+      _shouldReconnect = false;
+      _reconnectTimer?.cancel();
+      _connectionGeneration++;
+      final previousSubscription = _socketSubscription;
+      final previousSocket = _socketChannel;
+      _socketSubscription = null;
+      _socketChannel = null;
+      await previousSubscription?.cancel();
+      await previousSocket?.sink.close();
+      _raceHistory.clear();
+      _currentRaceId = null;
+      _reconnectAttempt = 0;
     }
 
-    // Don't create a second connection if one already exists.
-    if (_socketChannel != null) {
-      print("Already connected to a race server.");
+    _serverAddress = address;
+    _shouldReconnect = true;
+    _reconnectTimer?.cancel();
+    await _openConnection();
+  }
+
+  Future<void> _openConnection() async {
+    if (!_shouldReconnect || _serverAddress == null ||
+        _isConnecting || _socketChannel != null) {
       return;
     }
 
     _isConnecting = true;
-    serverAddress = 'ws://$serverAddress:5000/mobile';
+    final generation = ++_connectionGeneration;
+    final uri = Uri.parse('ws://${_serverAddress!}:5000/mobile');
+    WebSocketChannel? channel;
+
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'connectionStatus',
+      'status': _reconnectAttempt == 0 ? 'connecting' : 'reconnecting',
+    });
 
     try {
-      print(
-        "Background service connecting to: "
-        "$serverAddress",
-      );
+      channel = WebSocketChannel.connect(uri);
+      _socketChannel = channel;
 
-      _socketChannel = WebSocketChannel.connect(Uri.parse(serverAddress));
-
-      // Send the user's registration information.
-      await _sendUserName();
-
-      _socketSubscription = _socketChannel!.stream.listen(
+      // Install listeners before registering so no early server messages
+      // are missed. Both onDone and onError funnel through one cleanup path.
+      _socketSubscription = channel.stream.listen(
         (event) {
-          print("Background WebSocket received: $event");
-
-          _receiveJSONString(event);
+          if (generation != _connectionGeneration) return;
+          if (event is String) _receiveJSONString(event);
         },
-        onDone: () {
-          print("Background WebSocket disconnected");
-
-          _socketChannel = null;
-          _socketSubscription = null;
-          FlutterForegroundTask.sendDataToMain({
-            'type': 'connectionStatus',
-            'status': 'disconnected',
-          });
+        onDone: () => _connectionLost(generation, channel!),
+        onError: (Object error) {
+          print('Background WebSocket error: $error');
+          _connectionLost(generation, channel!);
         },
-        onError: (error) {
-          FlutterForegroundTask.sendDataToMain({
-            'type': 'connectionStatus',
-            'status': 'error',
-          });
-          print("Background WebSocket error: $error");
-
-          _socketChannel = null;
-          _socketSubscription = null;
-        },
+        cancelOnError: true,
       );
 
-      print("Background WebSocket connected");
-      FlutterForegroundTask.sendDataToMain({
-        'type': 'connectionStatus',
-        'status': 'connected',
-      });
-    } catch (e, stackTrace) {
-      print("Background WebSocket connection error: $e");
+      // This throws on handshake/network failure. Do not claim connected
+      // merely because WebSocketChannel.connect() returned an object.
+      await channel.ready.timeout(const Duration(seconds: 10));
+      if (generation != _connectionGeneration || !_shouldReconnect) return;
 
-      print(stackTrace);
+      await _sendRegistration(channel);
+      if (generation != _connectionGeneration || !_shouldReconnect) return;
 
-      _socketChannel = null;
-      _socketSubscription = null;
+      // Keep 'connecting' until sessionIdentity arrives; that confirms
+      // the server processed registration, not just the socket handshake.
+      print('WebSocket ready; registration sent to $uri');
+    } catch (error) {
+      print('Background WebSocket connection failed: $error');
+      if (channel != null) {
+        _connectionLost(generation, channel);
+      } else {
+        _scheduleReconnect();
+      }
     } finally {
       _isConnecting = false;
     }
   }
 
-  Future<void> _sendUserName() async {
-    if (_socketChannel == null) return;
+  void _connectionLost(int generation, WebSocketChannel channel) {
+    if (generation != _connectionGeneration ||
+        !identical(_socketChannel, channel)) return;
+
+    _socketChannel = null;
+    final subscription = _socketSubscription;
+    _socketSubscription = null;
+    // Avoid awaiting here: the callback can originate inside the stream.
+    unawaited(subscription?.cancel() ?? Future<void>.value());
+    unawaited(channel.sink.close().catchError((Object _) {}));
+
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'connectionStatus',
+      'status': 'disconnected',
+    });
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (!_shouldReconnect || _serverAddress == null ||
+        _reconnectTimer?.isActive == true) return;
+
+    // Exponential backoff: 2, 4, 8, 16, 30, 30... seconds.
+    final seconds = _reconnectAttempt >= 4
+        ? 30
+        : 2 * (1 << _reconnectAttempt);
+    _reconnectAttempt++;
+    print('Retrying WebSocket in $seconds seconds');
+    _reconnectTimer = Timer(Duration(seconds: seconds), () {
+      _reconnectTimer = null;
+      unawaited(_openConnection());
+    });
+  }
+
+  Future<void> _disconnectFromServer() async {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _connectionGeneration++;
+    _serverAddress = null;
+
+    final subscription = _socketSubscription;
+    final channel = _socketChannel;
+    _socketSubscription = null;
+    _socketChannel = null;
+    await subscription?.cancel();
+    await channel?.sink.close();
+
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'connectionStatus',
+      'status': 'disconnected',
+    });
+  }
+
+  Future<void> _sendRegistration(WebSocketChannel channel) async {
+    final prefs = await SharedPreferences.getInstance();
+    final firstName = prefs.getString('firstName') ?? '';
+    final lastName = prefs.getString('lastName') ?? '';
+    final pin = prefs.getString('pin') ?? '';
+    // Keep tokens scoped by server address. Don't reuse a token with
+    // another race server on the same phone.
+    final tokenKey = 'raceResumeToken_${_serverAddress!}';
+    final resumeToken = prefs.getString(tokenKey) ?? '';
+
+    channel.sink.add(jsonEncode({
+      'type': 'registration',
+      'firstName': firstName,
+      'lastName': lastName,
+      'pin': pin,
+      if (resumeToken.isNotEmpty) 'resumeToken': resumeToken,
+    }));
+    // Never print a resume token or PIN to logs.
+    print('Registration sent for $firstName $lastName');
+  }
+
+  Future<void> _handleSessionIdentity(Map<String, dynamic> data) async {
+    final token = data['resumeToken'];
+    if (token is! String || token.isEmpty || _serverAddress == null) return;
 
     final prefs = await SharedPreferences.getInstance();
-
-    final storedFirstName = prefs.getString('firstName') ?? '';
-
-    final storedLastName = prefs.getString('lastName') ?? '';
-
-    final storedPin = prefs.getString('pin') ?? '';
-
-    final registration = {
-      "type": "registration",
-      "firstName": storedFirstName,
-      "lastName": storedLastName,
-      "pin": storedPin,
-    };
-
-    final json = jsonEncode(registration);
-
-    _socketChannel!.sink.add(json);
-
-    print("Background registration sent: $json");
+    await prefs.setString('raceResumeToken_${_serverAddress!}', token);
+    _reconnectAttempt = 0;
+    _reconnectTimer?.cancel();
+    FlutterForegroundTask.sendDataToMain({
+      'type': 'connectionStatus',
+      'status': 'connected',
+    });
+    print('Registered driver ${data['clientId']}; resumed: ${data['resumed']}');
   }
 
   void _pauseRace() {
@@ -271,6 +366,8 @@ class RaceTaskHandler extends TaskHandler {
       print("Raw JSON:");
       print(jsonString);
 
+      // The test server also sends a legacy plain-text CLIENT_ID message.
+      if (jsonString.startsWith('CLIENT_ID:')) return;
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
 
       final String? messageType = jsonData['type'];
@@ -281,11 +378,19 @@ class RaceTaskHandler extends TaskHandler {
       }
 
       switch (messageType) {
+        case 'sessionIdentity':
+          unawaited(_handleSessionIdentity(jsonData));
+          break;
+
         case 'notification':
           FlutterForegroundTask.sendDataToMain({
             'type': 'serverNotification',
             'notification': jsonData,
           });
+          break;
+
+        case 'raceSync':
+          _handleRaceSync(jsonData);
           break;
 
         case 'lapData':
@@ -327,10 +432,64 @@ class RaceTaskHandler extends TaskHandler {
     }
   }
 
+  // Replaces the background service's history without replaying old lap TTS.
+  // The UI must also handle the forwarded raceSync event atomically.
+  void _handleRaceSync(Map<String, dynamic> data) {
+    try {
+      final rawInfo = data['raceInfo'];
+      if (rawInfo is! Map) {
+        print('Ignoring raceSync without raceInfo');
+        return;
+      }
+
+      final raceInfoJson = Map<String, dynamic>.from(rawInfo);
+      // raceSync already carries raceInfo. Do not forward an additional
+      // raceInfo event, since it could asynchronously reset the UI snapshot.
+      final incomingRaceId = raceInfoJson['raceID']?.toString();
+      if (incomingRaceId != null && incomingRaceId != _currentRaceId) {
+        _currentRaceId = incomingRaceId;
+        _raceHistory.clear();
+      }
+
+      final rawLaps = data['laps'];
+      if (rawLaps is! List) {
+        print('Ignoring raceSync without laps list');
+        return;
+      }
+
+      final restored = <LapData>[];
+      for (final item in rawLaps) {
+        if (item is! Map) continue;
+        restored.add(LapData.fromJson(Map<String, dynamic>.from(item)));
+      }
+      restored.sort((a, b) => a.lapNumber.compareTo(b.lapNumber));
+
+      _raceHistory
+        ..clear()
+        ..addAll(restored);
+
+      FlutterForegroundTask.sendDataToMain({
+        ...data,
+        'type': 'raceSync',
+        'raceInfo': raceInfoJson,
+        'laps': restored.map((lap) => lap.toJson()).toList(),
+      });
+
+      print('Restored ${restored.length} historical laps (no TTS).');
+    } catch (e, stack) {
+      print('Error applying raceSync: $e');
+      print(stack);
+    }
+  }
+
   void _handleLapData(Map<String, dynamic> jsonData) async {
     try {
       final lapData = LapData.fromJson(jsonData);
 
+      if (_raceHistory.any((lap) => lap.lapNumber == lapData.lapNumber)) {
+        print('Ignoring duplicate lap ${lapData.lapNumber}');
+        return;
+      }
       _raceHistory.add(lapData);
 
       FlutterForegroundTask.sendDataToMain({
@@ -366,6 +525,11 @@ class RaceTaskHandler extends TaskHandler {
   void _handleRaceInfo(Map<String, dynamic> jsonData) {
     try {
       final raceInfo = RaceInfo.fromJson(jsonData);
+      final incomingRaceId = jsonData['raceID']?.toString();
+      if (incomingRaceId != null && incomingRaceId != _currentRaceId) {
+        _raceHistory.clear();
+        _currentRaceId = incomingRaceId;
+      }
 
       FlutterForegroundTask.sendDataToMain({
         'type': 'raceInfo',
@@ -494,6 +658,10 @@ class BackgroundRaceService {
       'type': 'connect',
       'serverAddress': serverAddress,
     });
+  }
+
+  static void disconnect() {
+    FlutterForegroundTask.sendDataToTask({'type': 'disconnect'});
   }
 
   static void requestRaceHistory() {

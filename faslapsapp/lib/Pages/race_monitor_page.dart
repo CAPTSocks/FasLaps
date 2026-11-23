@@ -43,6 +43,9 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   DateTime? _countdownEndTime;
   Timer? _displayTimer;
   Duration raceElapsed = Duration.zero;
+  DateTime? _lapRaceElapsedAnchor;
+  bool _hasAuthoritativeSync = false;
+  int _graphSyncVersion = 0;
 
   String status = "Connecting...";
   String raceName = "";
@@ -229,6 +232,10 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         await _handleRaceInfo(data);
         break;
 
+      case 'raceSync':
+        _handleRaceSync(data);
+        break;
+
       case 'pauseRace':
         _handlePauseRace();
         break;
@@ -290,6 +297,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         case 'error':
           status = "Connection Error";
           break;
+
+        case 'connecting':
+          status = "Connecting...";
+          break;
+
+        case 'reconnecting':
+          status = "Reconnecting...";
+          break;
       }
     });
   }
@@ -314,6 +329,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       final lapData = LapData.fromJson(Map<String, dynamic>.from(lapDataJson));
 
       if (!mounted) return;
+      if (raceHistory.any((lap) => lap.lapNumber == lapData.lapNumber)) return;
 
       print("New lap received: ${lapData.lapTimeSeconds}");
 
@@ -351,12 +367,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         return LapData.fromJson(Map<String, dynamic>.from(lapJson));
       }).toList();
 
-      if (!mounted) return;
+      if (!mounted || _hasAuthoritativeSync) return;
 
+      loadedHistory.sort((a, b) => b.lapNumber.compareTo(a.lapNumber));
       setState(() {
         raceHistory
           ..clear()
           ..addAll(loadedHistory);
+        _rebuildGraphFromHistory();
       });
 
       print(
@@ -368,6 +386,133 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
       print(e);
       print(stackTrace);
     }
+  }
+
+  // raceHistory is newest-first; LapTimeGraph expects oldest-to-newest.
+  void _rebuildGraphFromHistory() {
+    _recentLapTimes = raceHistory.reversed
+        .map((lap) => lap.lapTimeSeconds)
+        .where((time) => time > 0)
+        .toList();
+    if (_recentLapTimes.length > 100) {
+      _recentLapTimes = _recentLapTimes.sublist(_recentLapTimes.length - 100);
+    }
+  }
+
+  // Apply a complete authoritative snapshot in one setState, without TTS.
+  void _handleRaceSync(Map data) {
+    try {
+      if (data['raceInfo'] is! Map || data['laps'] is! List) {
+        debugPrint('Ignoring incomplete raceSync.');
+        return;
+      }
+
+      final infoJson = Map<String, dynamic>.from(data['raceInfo'] as Map);
+      final info = RaceInfo.fromJson(infoJson);
+      final restored = (data['laps'] as List)
+          .whereType<Map>()
+          .map((json) => LapData.fromJson(Map<String, dynamic>.from(json)))
+          .toList()
+        ..sort((a, b) => b.lapNumber.compareTo(a.lapNumber));
+
+      final rawState = (data['raceState'] ?? 'waiting').toString().toLowerCase();
+      final syncedState = switch (rawState) {
+        'running' => RaceState.running,
+        'paused' => RaceState.paused,
+        'finished' => RaceState.finished,
+        _ => RaceState.waiting,
+      };
+
+      final elapsedMs = (data['elapsedRaceTime'] as num?)?.toInt() ?? 0;
+      final remainingMs = (data['remainingRaceTimeMs'] as num?)?.toInt() ?? 0;
+      final minuteRace = infoJson['isMinuteRace'] == true;
+      final now = DateTime.now();
+      final synchronizedDisplayTime = minuteRace
+          ? Duration(milliseconds: remainingMs < 0 ? 0 : remainingMs)
+          : Duration(milliseconds: elapsedMs < 0 ? 0 : elapsedMs);
+      final rawEndTime = data['endTime'];
+      final parsedEndTime = rawEndTime is String
+          ? DateTime.tryParse(rawEndTime)?.toLocal()
+          : null;
+      final isNewRace = currentRaceInfo?.raceId != info.raceId;
+
+      if (!mounted) return;
+
+      _displayTimer?.cancel();
+      _displayTimer = null;
+
+      setState(() {
+        currentRaceInfo = info;
+        raceName = info.raceName;
+        raceHeat = info.raceHeat;
+        raceType = info.raceType;
+        raceInfoReceived = true;
+        isMinuteRace = minuteRace;
+        lapTotal = minuteRace ? 0 : info.raceLength;
+        showFuelBar = infoJson['showFuelBar'] is bool
+            ? infoJson['showFuelBar'] as bool : true;
+        canPauseRace = infoJson['canPauseRace'] is bool
+            ? infoJson['canPauseRace'] as bool : false;
+
+        if (isNewRace) {
+          raceSaved = false;
+          fuelAmount = 100;
+        }
+
+        raceHistory
+          ..clear()
+          ..addAll(restored);
+        _rebuildGraphFromHistory();
+        _graphSyncVersion++;
+        currentLap = restored.isNotEmpty ? restored.first.lapNumber : 0;
+        lapLeaderCurrentLap = (data['lapLeaderCurrentLap'] as num?)?.toInt() ?? 0;
+        raceElapsed = synchronizedDisplayTime;
+        raceState = syncedState;
+        raceEndTime = syncedState == RaceState.finished ? parsedEndTime : null;
+
+        // The server provides elapsed race time, which excludes pauses.
+        // Reconstruct display anchors from the snapshot received right now.
+        _countdownEndTime = minuteRace && syncedState == RaceState.running
+            ? now.add(synchronizedDisplayTime) : null;
+        _lapRaceElapsedAnchor = !minuteRace && syncedState == RaceState.running
+            ? now.subtract(synchronizedDisplayTime) : null;
+
+        raceStatus = switch (syncedState) {
+          RaceState.waiting => 'Waiting for Race to Begin',
+          RaceState.running => 'Race Running',
+          RaceState.paused => 'Race Paused',
+          RaceState.finished => 'Race Completed',
+        };
+        _hasAuthoritativeSync = true;
+      });
+
+      if (syncedState == RaceState.running) {
+        _startDisplayTimer();
+      }
+      _updateScreenAwake();
+      debugPrint('raceSync applied: ${restored.length} laps; state=$rawState');
+    } catch (e, stack) {
+      debugPrint('Error applying raceSync: $e');
+      debugPrint('$stack');
+    }
+  }
+
+  // Reuses one display-timer implementation for both race types.
+  void _startDisplayTimer() {
+    _displayTimer?.cancel();
+    _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted || raceState != RaceState.running) return;
+      final now = DateTime.now();
+      setState(() {
+        if (isMinuteRace && _countdownEndTime != null) {
+          final remaining = _countdownEndTime!.difference(now);
+          raceElapsed = remaining.isNegative ? Duration.zero : remaining;
+        } else if (!isMinuteRace && _lapRaceElapsedAnchor != null) {
+          raceElapsed = now.difference(_lapRaceElapsedAnchor!);
+        }
+      });
+      // Wait for server raceFinished; never infer completion locally.
+    });
   }
 
   Future<void> _handleRaceInfo(Map data) async {
@@ -382,8 +527,14 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         Map<String, dynamic>.from(raceInfoJson),
       );
 
+      // Reconnection may resend raceInfo for the *same* race.
+      // Do not reset its graph, timer, results, or saved state.
+      if (currentRaceInfo?.raceId == raceInfo.raceId) return;
+
+      final syncVersionAtStart = _graphSyncVersion;
+
       // Save the previous race before switching to the new one.
-      if (raceInfoReceived && currentRaceInfo != null) {
+      if (raceInfoReceived && currentRaceInfo != null && !raceSaved) {
         await RaceHistoryService.saveRace(
           currentRaceInfo!,
           raceHistory.reversed.toList(),
@@ -406,7 +557,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
       final existingRace = await RaceHistoryService.findRace(raceInfo.raceId);
 
-      if (!mounted) return;
+      if (!mounted || syncVersionAtStart != _graphSyncVersion) return;
 
       // Stop any timer left over from the previous race.
       _displayTimer?.cancel();
@@ -421,6 +572,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         raceState = RaceState.waiting;
         raceStatus = "Waiting for Race to Begin";
         raceSaved = false;
+        _hasAuthoritativeSync = false;
+        _lapRaceElapsedAnchor = null;
 
         raceStartTime = null;
         raceEndTime = null;
@@ -503,55 +656,36 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
 
   void _handleStartTime(Map data) {
     try {
-      print(
-        '[TIMER DEBUG] UI handling start command at '
-        '${DateTime.now().toIso8601String()}',
-      );
-
       final raceTime = RaceTime.fromJson(Map<String, dynamic>.from(data));
-
-      _displayTimer?.cancel();
-      _displayTimer = null;
-
       if (!mounted) return;
-
-      // Calculate the full race duration.
-      final raceDuration = Duration(minutes: currentRaceInfo?.raceLength ?? 0);
-
-      raceStartTime = raceTime.startTime;
-      _countdownEndTime = raceTime.startTime.add(raceDuration);
-      _updateTTSSettings();
-
+      _displayTimer?.cancel();
+      final now = DateTime.now();
+      final start = raceTime.startTime.toLocal();
+      final elapsed = now.difference(start);
+      final validElapsed = elapsed.isNegative ? Duration.zero : elapsed;
       setState(() {
+        raceStartTime = start;
         raceEndTime = null;
-        raceElapsed = raceDuration;
         raceState = RaceState.running;
-        _updateScreenAwake();
-      });
-
-      _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (!mounted ||
-            _countdownEndTime == null ||
-            raceState == RaceState.paused) {
-          return;
-        }
-
-        final remaining = _countdownEndTime!.difference(DateTime.now());
-
-        setState(() {
+        raceStatus = 'Race Running';
+        if (isMinuteRace) {
+          final total = Duration(minutes: currentRaceInfo?.raceLength ?? 0);
+          final remaining = total - validElapsed;
           raceElapsed = remaining.isNegative ? Duration.zero : remaining;
-          raceStatus = "Race Running";
-        });
-
-        // Stop updating once the countdown reaches zero.
-        if (remaining <= Duration.zero) {
-          _displayTimer?.cancel();
-          _displayTimer = null;
+          _countdownEndTime = now.add(raceElapsed);
+          _lapRaceElapsedAnchor = null;
+        } else {
+          raceElapsed = validElapsed;
+          _lapRaceElapsedAnchor = now.subtract(raceElapsed);
+          _countdownEndTime = null;
         }
       });
-    } catch (e, stackTrace) {
-      print("Error processing race start time: $e");
-      print(stackTrace);
+      _updateTTSSettings();
+      _startDisplayTimer();
+      _updateScreenAwake();
+    } catch (e, stack) {
+      debugPrint('Error handling race start time: $e');
+      debugPrint('$stack');
     }
   }
 
@@ -575,6 +709,8 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
         raceStatus = "Race Completed";
 
         raceState = RaceState.finished;
+        _countdownEndTime = null;
+        _lapRaceElapsedAnchor = null;
         _updateScreenAwake();
       });
 
@@ -596,54 +732,39 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
   }
 
   void _pauseTimer() {
-    if (raceState != RaceState.running) return;
-
+    if (raceState != RaceState.running || !mounted) return;
     _displayTimer?.cancel();
     _displayTimer = null;
-
-    if (!mounted) return;
-
+    final now = DateTime.now();
     setState(() {
+      if (isMinuteRace && _countdownEndTime != null) {
+        final remaining = _countdownEndTime!.difference(now);
+        raceElapsed = remaining.isNegative ? Duration.zero : remaining;
+      } else if (!isMinuteRace && _lapRaceElapsedAnchor != null) {
+        raceElapsed = now.difference(_lapRaceElapsedAnchor!);
+      }
       raceState = RaceState.paused;
-      _updateScreenAwake();
-      raceStatus = "Race Paused";
+      raceStatus = 'Race Paused';
+      _countdownEndTime = null;
+      _lapRaceElapsedAnchor = null;
     });
+    _updateScreenAwake();
   }
 
   void _resumeTimer() {
-    if (raceState != RaceState.paused || _countdownEndTime == null) return;
-
-    // Continue counting down from the frozen remaining time.
-    _countdownEndTime = DateTime.now().add(raceElapsed);
-
-    if (!mounted) return;
-
+    if (raceState != RaceState.paused || !mounted) return;
+    final now = DateTime.now();
     setState(() {
       raceState = RaceState.running;
-      _updateScreenAwake();
-    });
-
-    _displayTimer?.cancel();
-
-    _displayTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted ||
-          _countdownEndTime == null ||
-          raceState == RaceState.paused) {
-        return;
-      }
-
-      final remaining = _countdownEndTime!.difference(DateTime.now());
-
-      setState(() {
-        raceElapsed = remaining.isNegative ? Duration.zero : remaining;
-        raceStatus = "Race Running";
-      });
-
-      if (remaining <= Duration.zero) {
-        _displayTimer?.cancel();
-        _displayTimer = null;
+      raceStatus = 'Race Running';
+      if (isMinuteRace) {
+        _countdownEndTime = now.add(raceElapsed);
+      } else {
+        _lapRaceElapsedAnchor = now.subtract(raceElapsed);
       }
     });
+    _startDisplayTimer();
+    _updateScreenAwake();
   }
 
   double get lastLap {
@@ -994,7 +1115,7 @@ class _RaceMonitorPageState extends State<RaceMonitorPage> {
                                                   // Reset any internal graph state when
                                                   // a different race is configured.
                                                   key: ValueKey(
-                                                    currentRaceInfo?.raceId,
+                                                    '${currentRaceInfo?.raceId}-$_graphSyncVersion',
                                                   ),
                                                   child: LapTimeGraph(
                                                     lapTimes: _recentLapTimes,

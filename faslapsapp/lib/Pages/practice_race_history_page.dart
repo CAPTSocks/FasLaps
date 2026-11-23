@@ -93,7 +93,6 @@ class _PracticeRaceHistoryPageState extends State<PracticeRaceHistoryPage> {
               onPressed: () {
                 Navigator.pop(context, false);
               },
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
               child: const Text("Cancel"),
             ),
             TextButton(
